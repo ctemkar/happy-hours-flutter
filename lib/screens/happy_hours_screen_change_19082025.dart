@@ -25,22 +25,24 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
   List<HappyHourPlace> allBusinesses = [];
   final MapController _mapController = MapController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _businessController = TextEditingController();
 
   final List<String> autosuggestCities = [
     'Bangkok',
     'Mumbai',
+    // Major cities from US
     'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix',
+    // Major cities from Europe
     'London', 'Paris', 'Berlin', 'Madrid', 'Rome',
+    // Major cities from Middle East
     'Dubai', 'Riyadh', 'Doha', 'Abu Dhabi',
+    // Major cities from India
     'Delhi', 'Bangalore', 'Chennai', 'Kolkata',
+    // Major cities from Japan
     'Tokyo', 'Osaka', 'Kyoto',
+    // Major cities from Australia
     'Sydney', 'Melbourne', 'Brisbane',
+    // Major cities from New Zealand
     'Auckland', 'Wellington',
-  ];
-
-  final List<String> businessCategories = [
-    'All', 'Restaurant', 'Bar', 'Cafe', 'Fast Food', 'Spa', 'Massage'
   ];
 
   @override
@@ -52,7 +54,6 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
   @override
   void dispose() {
     _locationController.dispose();
-    _businessController.dispose();
     super.dispose();
   }
 
@@ -189,7 +190,7 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.place,
               color: Colors.white,
               size: 20,
@@ -263,68 +264,32 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
                       if (!showMap) ...[
                         Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              TypeAheadField<String>(
-                                textFieldConfiguration: TextFieldConfiguration(
-                                  controller: _locationController,
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.location_on, color: Colors.blue),
-                                    hintText: 'Your current location',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                  ),
+                          child: TypeAheadField<String>(
+                            textFieldConfiguration: TextFieldConfiguration(
+                              controller: _locationController,
+                              decoration: InputDecoration(
+                                prefixIcon: const Icon(Icons.location_on, color: Colors.blue),
+                                hintText: 'Select or type a city',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
                                 ),
-                                suggestionsCallback: (pattern) {
-                                  return autosuggestCities.where((city) =>
-                                      city.toLowerCase().contains(pattern.toLowerCase()));
-                                },
-                                itemBuilder: (context, String suggestion) {
-                                  return ListTile(
-                                    title: Text(suggestion, style: const TextStyle(color: Colors.black)),
-                                    tileColor: Colors.white,
-                                  );
-                                },
-                                onSuggestionSelected: (String suggestion) {
-                                  _setLocationAndFetch(suggestion);
-                                },
+                                filled: true,
+                                fillColor: Colors.grey.shade100,
                               ),
-                              const SizedBox(height: 8),
-                              TypeAheadField<String>(
-                                textFieldConfiguration: TextFieldConfiguration(
-                                  controller: _businessController,
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                                    hintText: 'Search businesses...',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                  ),
-                                ),
-                                suggestionsCallback: (pattern) {
-                                  return businessCategories.where((category) =>
-                                      category.toLowerCase().contains(pattern.toLowerCase()));
-                                },
-                                itemBuilder: (context, String suggestion) {
-                                  return ListTile(
-                                    title: Text(suggestion, style: const TextStyle(color: Colors.black)),
-                                    tileColor: Colors.white,
-                                  );
-                                },
-                                onSuggestionSelected: (String suggestion) {
-                                  setState(() {
-                                    _businessController.text = suggestion;
-                                  });
-                                },
-                              ),
-                            ],
+                            ),
+                            suggestionsCallback: (pattern) {
+                              return autosuggestCities.where((city) =>
+                                  city.toLowerCase().contains(pattern.toLowerCase()));
+                            },
+                            itemBuilder: (context, String suggestion) {
+                              return ListTile(
+                                title: Text(suggestion),
+                              );
+                            },
+                            onSuggestionSelected: (String suggestion) {
+                              _setLocationAndFetch(suggestion);
+                            },
                           ),
                         ),
                       ],
@@ -352,42 +317,8 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
                                 ],
                               )
                             : allBusinesses.isEmpty
-                                ? Center(
-                                    child: Card(
-                                      elevation: 6,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      margin: const EdgeInsets.all(20),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(24.0),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.hourglass_empty,
-                                                size: 60, color: Colors.orangeAccent),
-                                            const SizedBox(height: 16),
-                                            const Text(
-                                              "No Happy Hours Data Available",
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              "for $selectedLocation",
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 16,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                ? const Center(
+                                    child: Text('No businesses found'),
                                   )
                                 : ListView.builder(
                                     padding: const EdgeInsets.symmetric(horizontal: 16),
