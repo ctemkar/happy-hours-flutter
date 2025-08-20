@@ -51,8 +51,7 @@ function getHappyHours($conn, $city) {
     } else {
         $sql = "SELECT happy_hours_id, Name, Address, Google_Marker, image_link, Open_hours, 
                 Happy_hour_start, Happy_hour_end, Telephone, latitude, longitude 
-                FROM happy_hours_bangkok 
-                WHERE city = ?
+                FROM happy_hours_bangkok WHERE city = ?
                 AND TRIM(COALESCE(Open_hours, '')) NOT IN ('', 'false')
                 AND TRIM(COALESCE(Happy_hour_start, '')) NOT IN ('', 'false')
                 AND TRIM(COALESCE(Happy_hour_end, '')) NOT IN ('', 'false');";
@@ -63,10 +62,16 @@ function getHappyHours($conn, $city) {
     return $stmt->get_result();
 }
 
-// Fetch results directly (no Bangkok fallback)
+// 1️⃣ Try fetching for user city
 $result = getHappyHours($conn, $city);
 
-// Fetch all rows
+// 2️⃣ If no rows, fallback to Bangkok
+if ($result->num_rows === 0 && strtoupper($city) !== 'BANGKOK') {
+    $city = 'Bangkok';
+    $result = getHappyHours($conn, $city);
+}
+
+// 3️⃣ Fetch all rows
 $data = [];
 while ($row = $result->fetch_assoc()) {
     foreach ($row as $key => $value) {

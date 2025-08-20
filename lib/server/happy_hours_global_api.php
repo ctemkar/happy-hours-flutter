@@ -34,44 +34,48 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Get dropdown value
-$city = isset($_GET['city']) ? trim($_GET['city']) : 'ALL';
+// Get params
+$city     = isset($_GET['city']) ? trim($_GET['city']) : 'ALL';
+$business = isset($_GET['business']) ? trim($_GET['business']) : 'ALL';
 
-// Function to get data for a city
-function getHappyHours($conn, $city) {
-    if (strtoupper($city) === 'ALL') {
-        $sql = "SELECT happy_hours_id, Name, Address, Google_Marker, image_link, Open_hours, 
-                Happy_hour_start, Happy_hour_end, Telephone, latitude, longitude 
-                FROM happy_hours_bangkok
-                WHERE 
-                TRIM(COALESCE(Open_hours, '')) NOT IN ('', 'false')
-                AND TRIM(COALESCE(Happy_hour_start, '')) NOT IN ('', 'false')
-                AND TRIM(COALESCE(Happy_hour_end, '')) NOT IN ('', 'false');";
-        $stmt = $conn->prepare($sql);
-    } else {
-        $sql = "SELECT happy_hours_id, Name, Address, Google_Marker, image_link, Open_hours, 
-                Happy_hour_start, Happy_hour_end, Telephone, latitude, longitude 
-                FROM happy_hours_bangkok WHERE city = ?
-                AND TRIM(COALESCE(Open_hours, '')) NOT IN ('', 'false')
-                AND TRIM(COALESCE(Happy_hour_start, '')) NOT IN ('', 'false')
-                AND TRIM(COALESCE(Happy_hour_end, '')) NOT IN ('', 'false');";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("s", $city);
+// Function to get data for a city + business
+function getHappyHours($conn, $city, $business) {
+    $sql = "SELECT happy_hours_id, Name, Address, Google_Marker, image_link, Open_hours, 
+                   Happy_hour_start, Happy_hour_end, Telephone, latitude, longitude, city, Business_category
+            FROM happy_hours_bangkok
+            WHERE TRIM(COALESCE(Open_hours, '')) NOT IN ('', 'false')
+              AND TRIM(COALESCE(Happy_hour_start, '')) NOT IN ('', 'false')
+              AND TRIM(COALESCE(Happy_hour_end, '')) NOT IN ('', 'false')";
+
+    $params = [];
+    $types  = "";
+
+    // Apply filters
+    if (strtoupper($city) !== "ALL") {
+        $sql .= " AND city = ?";
+        $params[] = $city;
+        $types .= "s";
     }
+
+    if (strtoupper($business) !== "ALL") {
+        $sql .= " AND Business_category = ?";
+        $params[] = $business;
+        $types .= "s";
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+
     $stmt->execute();
     return $stmt->get_result();
 }
 
-// 1️⃣ Try fetching for user city
-$result = getHappyHours($conn, $city);
+// Fetch results
+$result = getHappyHours($conn, $city, $business);
 
-// 2️⃣ If no rows, fallback to Bangkok
-if ($result->num_rows === 0 && strtoupper($city) !== 'BANGKOK') {
-    $city = 'Bangkok';
-    $result = getHappyHours($conn, $city);
-}
-
-// 3️⃣ Fetch all rows
+// Fetch all rows
 $data = [];
 while ($row = $result->fetch_assoc()) {
     foreach ($row as $key => $value) {
