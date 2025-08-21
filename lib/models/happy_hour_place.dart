@@ -10,6 +10,7 @@ class HappyHourPlace {
   final String telephone;
   final double latitude;
   final double longitude;
+  final String category; // ✅ Added category field
 
   HappyHourPlace({
     required this.id,
@@ -23,6 +24,7 @@ class HappyHourPlace {
     required this.telephone,
     required this.latitude,
     required this.longitude,
+    required this.category, // ✅ Added in constructor
   });
 
   factory HappyHourPlace.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class HappyHourPlace {
       telephone: json['Telephone'] ?? '',
       latitude: double.tryParse(json['latitude'].toString()) ?? 0.0,
       longitude: double.tryParse(json['longitude'].toString()) ?? 0.0,
+      category: json['Business_category'] ?? 'Uncategorized', // ✅ Fallback value
     );
   }
 }

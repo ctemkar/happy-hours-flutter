@@ -143,8 +143,8 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     }
   }
 
-  Future<void> _setLocationAndFetch(String city) async {
-    print('Starting fetch for city: $city');
+  Future<void> _setLocationAndFetch(String city, [String business = 'ALL']) async {
+    print('Starting fetch for city: $city and business: $business');
 
     setState(() {
       selectedLocation = city;
@@ -154,17 +154,17 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     });
 
     try {
-      final places = await fetchHappyHours(city);
+      final places = await fetchHappyHours(city: city, business: business);
       print('Fetch successful, received ${places.length} places');
       setState(() {
         allBusinesses = places;
         isLoading = false;
       });
+
       if (allBusinesses.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _mapController.move(
-            LatLng(allBusinesses.first.latitude,
-                allBusinesses.first.longitude),
+            LatLng(allBusinesses.first.latitude, allBusinesses.first.longitude),
             12.0,
           );
         });
@@ -236,222 +236,310 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+Widget build(BuildContext context) {
+  // 👉 Filter list by category
+  final filteredBusinesses = selectedCategory == 'ALL'
+      ? allBusinesses
+      : allBusinesses
+          .where((b) =>
+              b.category.toLowerCase() == selectedCategory.toLowerCase())
+          .toList();
+
+  return Scaffold(
+    backgroundColor: Colors.white,
+    resizeToAvoidBottomInset: false,
+    appBar: AppBar(
+      elevation: 0,
       backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        title: const Text(
-          'Happy Hours',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
+      title: const Text(
+        'Happy Hours',
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+          fontSize: 24,
         ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            onPressed: _toggleMapView,
-            icon: Icon(
-              showMap ? Icons.list : Icons.map,
-              color: Colors.blue,
-            ),
-            tooltip: showMap ? 'Show List' : 'Show Map',
-          ),
-        ],
       ),
-      body: SafeArea(
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : errorMessage.isNotEmpty
-                ? Center(child: Text(errorMessage))
-                : Column(
-                    children: [
-                      if (!showMap) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              // Location input
-                              TypeAheadField<String>(
-                                textFieldConfiguration:
-                                    TextFieldConfiguration(
-                                  controller: _locationController,
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.location_on,
-                                        color: Colors.blue),
-                                    hintText: 'Your current location',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
+      centerTitle: false,
+      actions: [
+        IconButton(
+          onPressed: _toggleMapView,
+          icon: Icon(
+            showMap ? Icons.list : Icons.map,
+            color: Colors.blue,
+          ),
+          tooltip: showMap ? 'Show List' : 'Show Map',
+        ),
+      ],
+    ),
+    body: SafeArea(
+      child: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage.isNotEmpty
+              ? Center(child: Text(errorMessage))
+              : Column(
+                  children: [
+                    if (!showMap) ...[
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            // Location input
+                            TypeAheadField<String>(
+                              textFieldConfiguration: TextFieldConfiguration(
+                                controller: _locationController,
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.location_on,
+                                      color: Colors.blue),
+                                  hintText: 'Your current location',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide.none,
                                   ),
+                                  filled: true,
+                                  fillColor: Colors.white,
                                 ),
-                                suggestionsCallback: (pattern) {
-                                  return autosuggestCities.where((city) =>
-                                      city.toLowerCase().contains(
-                                          pattern.toLowerCase()));
-                                },
-                                itemBuilder: (context, String suggestion) {
-                                  return ListTile(
-                                    title: Text(suggestion,
-                                        style: const TextStyle(
-                                            color: Colors.black)),
-                                    tileColor: Colors.white,
+                              ),
+                              suggestionsCallback: (pattern) {
+                                return autosuggestCities.where((city) =>
+                                    city.toLowerCase().contains(
+                                        pattern.toLowerCase()));
+                              },
+                              itemBuilder: (context, String suggestion) {
+                                return ListTile(
+                                  title: Text(suggestion,
+                                      style: const TextStyle(
+                                          color: Colors.black)),
+                                  tileColor: Colors.white,
+                                );
+                              },
+                              onSuggestionSelected: (String suggestion) {
+                                _setLocationAndFetch(suggestion);
+                              },
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Business category buttons
+                            SizedBox(
+                              height: 40,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: businessCategories.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final category = businessCategories[index];
+                                  final isSelected =
+                                      selectedCategory == category;
+
+                                  return ChoiceChip(
+                                    label: Text(category),
+                                    selected: isSelected,
+                                    onSelected: (_) {
+                                      setState(() {
+                                        selectedCategory = category;
+                                      });
+
+                                      // 🔑 Fetch again with city + business category
+                                      _setLocationAndFetch(
+                                          selectedLocation, category);
+                                    },
+                                    selectedColor: Colors.blue,
+                                    backgroundColor: Colors.grey[200],
+                                    labelStyle: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
                                   );
                                 },
-                                onSuggestionSelected: (String suggestion) {
-                                  _setLocationAndFetch(suggestion);
-                                },
                               ),
-                              const SizedBox(height: 12),
-
-                              // Business category buttons
-                              SizedBox(
-                                height: 40,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: businessCategories.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(width: 8),
-                                  itemBuilder: (context, index) {
-                                    final category =
-                                        businessCategories[index];
-                                    final isSelected =
-                                        selectedCategory == category;
-
-                                    return ChoiceChip(
-                                      label: Text(category),
-                                      selected: isSelected,
-                                      onSelected: (_) {
-                                        setState(() {
-                                          selectedCategory = category;
-                                        });
-                                      },
-                                      selectedColor: Colors.blue,
-                                      backgroundColor: Colors.grey[200],
-                                      labelStyle: TextStyle(
-                                        color: isSelected
-                                            ? Colors.white
-                                            : Colors.black,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                      Expanded(
-                        child: showMap
-                            ? FlutterMap(
-                                mapController: _mapController,
-                                options: MapOptions(
-                                  initialCenter: allBusinesses.isNotEmpty
-                                      ? LatLng(allBusinesses.first.latitude,
-                                          allBusinesses.first.longitude)
-                                      : LatLng(0, 0),
-                                  initialZoom: 12.0,
-                                  minZoom: 3.0,
-                                  maxZoom: 18.0,
+                      ),
+
+                      // 🔹 SEO Heading + Short Description
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              "Best Happy Hour Deals Near You", // H1
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              "Discover the best happy hour spots in your city. "
+                              "From local bars, Restaurants, Cafes to global chains, find amazing deals on drinks and food happening right now.",
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.4,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(),
+                    ],
+                    Expanded(
+                      child: showMap
+                          ? FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: allBusinesses.isNotEmpty
+                                    ? LatLng(allBusinesses.first.latitude,
+                                        allBusinesses.first.longitude)
+                                    : LatLng(0, 0),
+                                initialZoom: 12.0,
+                                minZoom: 3.0,
+                                maxZoom: 18.0,
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName:
+                                      'com.example.happy_hours_app',
+                                  maxZoom: 19,
                                 ),
-                                children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                    userAgentPackageName:
-                                        'com.example.happy_hours_app',
-                                    maxZoom: 19,
-                                  ),
-                                  MarkerLayer(
-                                    markers: _markers,
-                                  ),
-                                ],
-                              )
-                            : allBusinesses.isEmpty
-                                ? Center(
-                                    child: Card(
-                                      elevation: 6,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(20),
-                                      ),
-                                      margin: const EdgeInsets.all(20),
-                                      child: Padding(
-                                        padding:
-                                            const EdgeInsets.all(24.0),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.hourglass_empty,
-                                                size: 60,
-                                                color: Colors.orangeAccent),
-                                            const SizedBox(height: 16),
-                                            const Text(
-                                              "No Happy Hours Data Available",
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                              ),
-                                              textAlign: TextAlign.center,
+                                MarkerLayer(
+                                  markers: _markers,
+                                ),
+                              ],
+                            )
+                          : allBusinesses.isEmpty
+                              // Case 1: No businesses in this city
+                              ? Center(
+                                  child: Card(
+                                    elevation: 6,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(20),
+                                    ),
+                                    margin: const EdgeInsets.all(20),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24.0),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.hourglass_empty,
+                                              size: 60,
+                                              color: Colors.orangeAccent),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                            "No Happy Hours Data Available",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
                                             ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              "for $selectedLocation",
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 16,
-                                              ),
-                                              textAlign: TextAlign.center,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            "for $selectedLocation",
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 16,
                                             ),
-                                          ],
-                                        ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
-                                    itemCount: allBusinesses.length,
-                                    itemBuilder: (context, index) {
-                                      final business = allBusinesses[index];
-                                      final isBookmarked =
-                                          bookmarkedPlaces
-                                              .contains(business.id);
-
-                                      // TODO: you can filter list here by selectedCategory if needed
-                                      return BusinessCard(
-                                        business: business,
-                                        isBookmarked: isBookmarked,
-                                        onTap: () =>
-                                            _openBusinessDetails(business),
-                                        onBookmarkTap: () {
-                                          setState(() {
-                                            if (isBookmarked) {
-                                              bookmarkedPlaces
-                                                  .remove(business.id);
-                                            } else {
-                                              bookmarkedPlaces
-                                                  .add(business.id);
-                                            }
-                                          });
-                                        },
-                                      );
-                                    },
                                   ),
-                      ),
-                    ],
-                  ),
-      ),
-    );
-  }
+                                )
+                              : filteredBusinesses.isEmpty
+                                  // Case 2: City has data but not for this category
+                                  ? Center(
+                                      child: Card(
+                                        elevation: 6,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        margin: const EdgeInsets.all(20),
+                                        child: Padding(
+                                          padding:
+                                              const EdgeInsets.all(24.0),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.hourglass_empty,
+                                                  size: 60,
+                                                  color: Colors.redAccent),
+                                              const SizedBox(height: 16),
+                                              const Text(
+                                                "No Data Available",
+                                                style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                  fontSize: 18,
+                                                ),
+                                                textAlign:
+                                                    TextAlign.center,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                "for $selectedLocation and Business $selectedCategory",
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 16,
+                                                ),
+                                                textAlign:
+                                                    TextAlign.center,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  // Case 3: Businesses exist
+                                  : ListView.builder(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 16),
+                                      itemCount:
+                                          filteredBusinesses.length,
+                                      itemBuilder: (context, index) {
+                                        final business =
+                                            filteredBusinesses[index];
+                                        final isBookmarked =
+                                            bookmarkedPlaces
+                                                .contains(business.id);
+
+                                        return BusinessCard(
+                                          business: business,
+                                          isBookmarked: isBookmarked,
+                                          onTap: () =>
+                                              _openBusinessDetails(
+                                                  business),
+                                          onBookmarkTap: () {
+                                            setState(() {
+                                              if (isBookmarked) {
+                                                bookmarkedPlaces
+                                                    .remove(business.id);
+                                              } else {
+                                                bookmarkedPlaces
+                                                    .add(business.id);
+                                              }
+                                            });
+                                          },
+                                        );
+                                      },
+                                    ),
+                    ),
+                  ],
+                ),
+    ),
+  );
+}
 }
