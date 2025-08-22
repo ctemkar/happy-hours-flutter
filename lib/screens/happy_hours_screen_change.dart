@@ -7,6 +7,8 @@ import '../models/happy_hour_place.dart';
 import '../services/happy_hours_api_service.dart';
 import '../widgets/business_card.dart';
 import '../widgets/business_details_dialog.dart';
+import 'package:url_launcher/url_launcher.dart'; // ✅ Add this import at the top
+
 
 class HappyHoursScreen extends StatefulWidget {
   const HappyHoursScreen({super.key});
@@ -392,28 +394,138 @@ Widget build(BuildContext context) {
                     ],
                     Expanded(
                       child: showMap
-                          ? FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: allBusinesses.isNotEmpty
-                                    ? LatLng(allBusinesses.first.latitude,
-                                        allBusinesses.first.longitude)
-                                    : LatLng(0, 0),
-                                initialZoom: 12.0,
-                                minZoom: 3.0,
-                                maxZoom: 18.0,
-                              ),
+                          ? Stack(
                               children: [
-                                TileLayer(
-                                  urlTemplate:
-                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName:
-                                      'com.example.happy_hours_app',
-                                  maxZoom: 19,
+                                // 🔹 MAP VIEW
+                                FlutterMap(
+                                  mapController: _mapController,
+                                  options: MapOptions(
+                                    initialCenter: allBusinesses.isNotEmpty
+                                        ? LatLng(allBusinesses.first.latitude,
+                                            allBusinesses.first.longitude)
+                                        : LatLng(0, 0),
+                                    initialZoom: 12.0,
+                                    minZoom: 3.0,
+                                    maxZoom: 18.0,
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      userAgentPackageName: 'com.example.happy_hours_app',
+                                      maxZoom: 19,
+                                    ),
+                                    MarkerLayer(markers: _markers),
+                                  ],
                                 ),
-                                MarkerLayer(
-                                  markers: _markers,
+
+                                // 🔹 ZOOM CONTROLS
+                                Positioned(
+                                  top: 20,
+                                  right: 10,
+                                  child: Column(
+                                    children: [
+                                      FloatingActionButton(
+                                        heroTag: "zoomIn",
+                                        mini: true,
+                                        backgroundColor: Colors.white,
+                                        onPressed: () {
+                                          _mapController.move(
+                                            _mapController.camera.center,
+                                            _mapController.camera.zoom + 1,
+                                          );
+                                        },
+                                        child: const Icon(Icons.add, color: Colors.black),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      FloatingActionButton(
+                                        heroTag: "zoomOut",
+                                        mini: true,
+                                        backgroundColor: Colors.white,
+                                        onPressed: () {
+                                          _mapController.move(
+                                            _mapController.camera.center,
+                                            _mapController.camera.zoom - 1,
+                                          );
+                                        },
+                                        child: const Icon(Icons.remove, color: Colors.black),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+
+                                // 🔹 GOOGLE MAPS + DIRECTIONS BUTTONS
+                                if (allBusinesses.isNotEmpty)
+                                  Positioned(
+                                    bottom: 20,
+                                    left: 20,
+                                    right: 20,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // View on Google Maps
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 14),
+                                            elevation: 6,
+                                          ),
+                                          onPressed: () async {
+                                            final lat = allBusinesses.first.latitude;
+                                            final lng = allBusinesses.first.longitude;
+                                            final url = Uri.parse(
+                                                "https://www.google.com/maps/search/?api=1&query=$lat,$lng");
+
+                                            if (!await launchUrl(
+                                              url,
+                                              mode: LaunchMode.platformDefault, // ✅ mobile/web safe
+                                              webOnlyWindowName:
+                                                  '_blank', // ✅ ensures opens in new tab on web
+                                            )) {
+                                              throw Exception("Could not launch $url");
+                                            }
+                                          },
+                                          icon: const Icon(Icons.map, color: Colors.white),
+                                          label: const Text("Google Maps",
+                                              style: TextStyle(color: Colors.white)),
+                                        ),
+
+                                        // Directions Button
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 14),
+                                            elevation: 6,
+                                          ),
+                                          onPressed: () async {
+                                            final lat = allBusinesses.first.latitude;
+                                            final lng = allBusinesses.first.longitude;
+                                            final url = Uri.parse(
+                                                "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng");
+
+                                            if (!await launchUrl(
+                                              url,
+                                              mode: LaunchMode.platformDefault, // ✅ works on both
+                                              webOnlyWindowName: '_blank',
+                                            )) {
+                                              throw Exception("Could not launch $url");
+                                            }
+                                          },
+                                          icon: const Icon(Icons.directions, color: Colors.white),
+                                          label: const Text("Directions",
+                                              style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             )
                           : allBusinesses.isEmpty
@@ -422,8 +534,7 @@ Widget build(BuildContext context) {
                                   child: Card(
                                     elevation: 6,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
                                     margin: const EdgeInsets.all(20),
                                     child: Padding(
@@ -432,8 +543,7 @@ Widget build(BuildContext context) {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           const Icon(Icons.hourglass_empty,
-                                              size: 60,
-                                              color: Colors.orangeAccent),
+                                              size: 60, color: Colors.orangeAccent),
                                           const SizedBox(height: 16),
                                           const Text(
                                             "No Happy Hours Data Available",
@@ -463,29 +573,24 @@ Widget build(BuildContext context) {
                                       child: Card(
                                         elevation: 6,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(20),
                                         ),
                                         margin: const EdgeInsets.all(20),
                                         child: Padding(
-                                          padding:
-                                              const EdgeInsets.all(24.0),
+                                          padding: const EdgeInsets.all(24.0),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               const Icon(Icons.hourglass_empty,
-                                                  size: 60,
-                                                  color: Colors.redAccent),
+                                                  size: 60, color: Colors.redAccent),
                                               const SizedBox(height: 16),
                                               const Text(
                                                 "No Data Available",
                                                 style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold,
+                                                  fontWeight: FontWeight.bold,
                                                   fontSize: 18,
                                                 ),
-                                                textAlign:
-                                                    TextAlign.center,
+                                                textAlign: TextAlign.center,
                                               ),
                                               const SizedBox(height: 8),
                                               Text(
@@ -494,8 +599,7 @@ Widget build(BuildContext context) {
                                                   color: Colors.grey[600],
                                                   fontSize: 16,
                                                 ),
-                                                textAlign:
-                                                    TextAlign.center,
+                                                textAlign: TextAlign.center,
                                               ),
                                             ],
                                           ),
@@ -504,32 +608,23 @@ Widget build(BuildContext context) {
                                     )
                                   // Case 3: Businesses exist
                                   : ListView.builder(
-                                      padding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 16),
-                                      itemCount:
-                                          filteredBusinesses.length,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      itemCount: filteredBusinesses.length,
                                       itemBuilder: (context, index) {
-                                        final business =
-                                            filteredBusinesses[index];
+                                        final business = filteredBusinesses[index];
                                         final isBookmarked =
-                                            bookmarkedPlaces
-                                                .contains(business.id);
+                                            bookmarkedPlaces.contains(business.id);
 
                                         return BusinessCard(
                                           business: business,
                                           isBookmarked: isBookmarked,
-                                          onTap: () =>
-                                              _openBusinessDetails(
-                                                  business),
+                                          onTap: () => _openBusinessDetails(business),
                                           onBookmarkTap: () {
                                             setState(() {
                                               if (isBookmarked) {
-                                                bookmarkedPlaces
-                                                    .remove(business.id);
+                                                bookmarkedPlaces.remove(business.id);
                                               } else {
-                                                bookmarkedPlaces
-                                                    .add(business.id);
+                                                bookmarkedPlaces.add(business.id);
                                               }
                                             });
                                           },
