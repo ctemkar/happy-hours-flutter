@@ -52,7 +52,7 @@ Future<List<HappyHourPlace>> fetchHappyHours({
 }) async {
   // Always start with city
   String urlString =
-      'https://customercallsapp.com/prod/customercallsapp/happy_hours_global_api_new.php?city=${Uri.encodeComponent(city)}';
+      'https://lovehappyhours.com/happy-hours-api/happy_hours_global_api_new.php?city=${Uri.encodeComponent(city)}';
 
   // If business is anything other than ALL, append it
   if (business.isNotEmpty && business.toUpperCase() != 'ALL') {
