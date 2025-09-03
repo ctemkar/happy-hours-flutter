@@ -9,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/happy_hour_place.dart';
 import '../services/happy_hours_api_service.dart';
 import '../widgets/business_card.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 class HappyHoursScreen extends StatefulWidget {
   const HappyHoursScreen({super.key});
@@ -248,16 +250,16 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     debugPrint("Opening details for: ${business.name} -> $filename");
 
     if (kIsWeb) {
-      // On Web: open the HTML file from assets directly in a new tab
-      final url = Uri.parse('assets/output_html/$filename');
-      if (!await launchUrl(
-        url,
-        webOnlyWindowName: '_blank', // ✅ opens in a new browser tab
-      )) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Could not open $filename")),
-        );
-      }
+      // On Web: open the HTML file from assets directly in the same tab
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BusinessHtmlPage(
+            filename: filename, 
+            title: business.name,
+            onBack: () => Navigator.of(context).pop(),
+          ),
+        ),
+      );
       return;
     }
 
@@ -685,7 +687,14 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
 class BusinessHtmlPage extends StatefulWidget {
   final String filename;
   final String title;
-  const BusinessHtmlPage({required this.filename, required this.title, super.key});
+  final VoidCallback? onBack;
+
+  const BusinessHtmlPage({
+    required this.filename,
+    required this.title,
+    this.onBack,
+    super.key,
+  });
 
   @override
   State<BusinessHtmlPage> createState() => _BusinessHtmlPageState();
@@ -704,11 +713,25 @@ class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
 
   Future<void> _loadHtml() async {
     try {
-      final data = await rootBundle.loadString('assets/output_html/${widget.filename}');
-      setState(() {
-        htmlData = data;
-        loading = false;
-      });
+      if (kIsWeb) {
+        // ✅ On Web → fetch via HTTP
+        final response = await http.get(Uri.parse('assets/output_html/${widget.filename}'));
+        if (response.statusCode == 200) {
+          setState(() {
+            htmlData = response.body;
+            loading = false;
+          });
+        } else {
+          throw Exception("HTTP ${response.statusCode}");
+        }
+      } else {
+        // ✅ On Mobile → load via rootBundle
+        final data = await rootBundle.loadString('output_html/${widget.filename}');
+        setState(() {
+          htmlData = data;
+          loading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         error = 'Could not load file: ${widget.filename}\n$e';
@@ -721,28 +744,60 @@ class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
   Widget build(BuildContext context) {
     if (loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          leading: widget.onBack != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: widget.onBack,
+                )
+              : null,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          leading: widget.onBack != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: widget.onBack,
+                )
+              : null,
+        ),
         body: Center(child: Text(error!)),
       );
     }
 
-    // Show HTML data in InAppWebView using initialData
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: InAppWebView(
-        initialData: InAppWebViewInitialData(data: htmlData!),
-        initialOptions: InAppWebViewGroupOptions(
-          android: AndroidInAppWebViewOptions(useHybridComposition: true),
-          ios: IOSInAppWebViewOptions(allowsInlineMediaPlayback: true),
-        ),
+      appBar: AppBar(
+        title: Text(widget.title),
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
       ),
+      body: kIsWeb
+          ? // ✅ On Web → render HTML directly
+          SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: HtmlWidget(htmlData ?? "<p>No Data</p>"),
+              ),
+            )
+          : // ✅ On Mobile → use InAppWebView
+          InAppWebView(
+              initialData: InAppWebViewInitialData(data: htmlData!),
+              initialOptions: InAppWebViewGroupOptions(
+                android: AndroidInAppWebViewOptions(useHybridComposition: true),
+                ios: IOSInAppWebViewOptions(allowsInlineMediaPlayback: true),
+              ),
+            ),
     );
   }
 }

@@ -36,6 +36,7 @@ dependencies:
   geocoding: ^2.1.0
   flutter_typeahead: ^4.3.7
   http: ^1.2.2
+  flutter_widget_from_html: ^0.17.0
   url_launcher: ^6.2.6
   flutter_inappwebview: ^5.7.2+3
   # The following adds the Cupertino Icons font to your application.
@@ -64,7 +65,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/output_html/
+    - output_html/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
