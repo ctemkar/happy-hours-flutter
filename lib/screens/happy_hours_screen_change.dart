@@ -11,6 +11,8 @@ import '../services/happy_hours_api_service.dart';
 import '../widgets/business_card.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:web/web.dart' as web;
+import 'dart:ui_web' as ui_web;
 
 class HappyHoursScreen extends StatefulWidget {
   const HappyHoursScreen({super.key});
@@ -558,7 +560,8 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
                                               if (!await launchUrl(
                                                 url,
                                                 mode: LaunchMode.platformDefault,
-                                                webOnlyWindowName: '_blank',
+                                                webOnlyWindowName:
+                                                    '_blank',
                                               )) {
                                                 throw Exception("Could not launch $url");
                                               }
@@ -683,7 +686,7 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
   }
 }
 
-// Business HTML Page Widget
+// ------------------------- Business HTML Page Widget (Updated with iframe) -------------------------
 class BusinessHtmlPage extends StatefulWidget {
   final String filename;
   final String title;
@@ -701,76 +704,44 @@ class BusinessHtmlPage extends StatefulWidget {
 }
 
 class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
-  String? htmlData;
-  bool loading = true;
   String? error;
 
   @override
   void initState() {
     super.initState();
-    _loadHtml();
+
+    if (kIsWeb) {
+      final viewType = widget.filename; // unique ID per business
+      final iframeUrl = 'assets/output_html/${widget.filename}';
+
+      // Register iframe with Flutter Web
+      ui_web.platformViewRegistry.registerViewFactory(
+        viewType,
+        (int viewId) {
+          final element = web.document.createElement('iframe') as web.HTMLIFrameElement;
+          element.src = iframeUrl;
+          element.style.border = '0';
+          element.style.width = '100%';
+          element.style.height = '100%';
+          return element;
+        },
+      );
+    }
   }
 
-  Future<void> _loadHtml() async {
-    try {
-      if (kIsWeb) {
-        // ✅ On Web → fetch via HTTP
-        final response = await http.get(Uri.parse('assets/output_html/${widget.filename}'));
-        if (response.statusCode == 200) {
-          setState(() {
-            htmlData = response.body;
-            loading = false;
-          });
-        } else {
-          throw Exception("HTTP ${response.statusCode}");
-        }
-      } else {
-        // ✅ On Mobile → load via rootBundle
-        final data = await rootBundle.loadString('output_html/${widget.filename}');
-        setState(() {
-          htmlData = data;
-          loading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        error = 'Could not load file: ${widget.filename}\n$e';
-        loading = false;
-      });
+  Future<void> _openExternally(String urlStr) async {
+    final uri = Uri.tryParse(urlStr);
+    if (uri == null) return;
+    if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+      debugPrint("Could not launch $urlStr");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          leading: widget.onBack != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: widget.onBack,
-                )
-              : null,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          leading: widget.onBack != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: widget.onBack,
-                )
-              : null,
-        ),
-        body: Center(child: Text(error!)),
-      );
-    }
+    final iframeUrl = kIsWeb
+        ? 'assets/output_html/${widget.filename}' // from web assets
+        : Uri.file('output_html/${widget.filename}').toString(); // local on mobile
 
     return Scaffold(
       appBar: AppBar(
@@ -783,20 +754,48 @@ class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
             : null,
       ),
       body: kIsWeb
-          ? // ✅ On Web → render HTML directly
-          SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: HtmlWidget(htmlData ?? "<p>No Data</p>"),
-              ),
-            )
-          : // ✅ On Mobile → use InAppWebView
-          InAppWebView(
-              initialData: InAppWebViewInitialData(data: htmlData!),
+          // ✅ On Web: full styled HTML page inside iframe
+          ? HtmlElementView(viewType: widget.filename)
+
+          // ✅ On Mobile: load HTML from assets in InAppWebView
+          : InAppWebView(
+              initialUrlRequest: URLRequest(url: Uri.parse(iframeUrl)),
               initialOptions: InAppWebViewGroupOptions(
                 android: AndroidInAppWebViewOptions(useHybridComposition: true),
                 ios: IOSInAppWebViewOptions(allowsInlineMediaPlayback: true),
+                crossPlatform: InAppWebViewOptions(javaScriptEnabled: true),
               ),
+              shouldOverrideUrlLoading: (controller, navigationAction) async {
+                final uri = navigationAction.request.url;
+                if (uri == null) return NavigationActionPolicy.CANCEL;
+
+                // Handle Phone / Email / SMS
+                final scheme = uri.scheme.toLowerCase();
+                if (scheme == 'tel' || scheme == 'mailto' || scheme == 'sms') {
+                  await _openExternally(uri.toString());
+                  return NavigationActionPolicy.CANCEL;
+                }
+
+                // Handle Google Maps Links
+                if (uri.toString().contains('maps.google') ||
+                    uri.toString().contains('google.com/maps') ||
+                    uri.host.toLowerCase().contains('maps')) {
+                  await _openExternally(uri.toString());
+                  return NavigationActionPolicy.CANCEL;
+                }
+
+                return NavigationActionPolicy.ALLOW;
+              },
+              onLoadError: (controller, url, code, message) {
+                setState(() {
+                  error = "Load error: $message";
+                });
+              },
+              onLoadHttpError: (controller, url, code, message) {
+                setState(() {
+                  error = "HTTP error $code: $message";
+                });
+              },
             ),
     );
   }
