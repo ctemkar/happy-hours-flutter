@@ -252,20 +252,13 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     debugPrint("Opening details for: ${business.name} -> $filename");
 
     if (kIsWeb) {
-      // On Web: open the HTML file from assets directly in the same tab
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BusinessHtmlPage(
-            filename: filename, 
-            title: business.name,
-            onBack: () => Navigator.of(context).pop(),
-          ),
-        ),
-      );
+      // 🚀 On Web: redirect browser to static HTML file in the same tab
+      final url = '/alpha/output_html/$filename';
+      web.window.location.assign(url);
       return;
     }
 
-    // On Mobile: open inside the app using InAppWebView
+    // 📱 On Mobile: open inside the app using InAppWebView
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
@@ -686,7 +679,7 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
   }
 }
 
-// ------------------------- Business HTML Page Widget (Updated with iframe) -------------------------
+// ------------------------- Business HTML Page Widget (Mobile Only) -------------------------
 class BusinessHtmlPage extends StatefulWidget {
   final String filename;
   final String title;
@@ -706,29 +699,6 @@ class BusinessHtmlPage extends StatefulWidget {
 class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
   String? error;
 
-  @override
-  void initState() {
-    super.initState();
-
-    if (kIsWeb) {
-      final viewType = widget.filename; // unique ID per business
-      final iframeUrl = 'assets/output_html/${widget.filename}';
-
-      // Register iframe with Flutter Web
-      ui_web.platformViewRegistry.registerViewFactory(
-        viewType,
-        (int viewId) {
-          final element = web.document.createElement('iframe') as web.HTMLIFrameElement;
-          element.src = iframeUrl;
-          element.style.border = '0';
-          element.style.width = '100%';
-          element.style.height = '100%';
-          return element;
-        },
-      );
-    }
-  }
-
   Future<void> _openExternally(String urlStr) async {
     final uri = Uri.tryParse(urlStr);
     if (uri == null) return;
@@ -739,9 +709,7 @@ class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
 
   @override
   Widget build(BuildContext context) {
-    final iframeUrl = kIsWeb
-        ? 'assets/output_html/${widget.filename}' // from web assets
-        : Uri.file('output_html/${widget.filename}').toString(); // local on mobile
+    final iframeUrl = Uri.file('output_html/${widget.filename}').toString(); // local on mobile
 
     return Scaffold(
       appBar: AppBar(
@@ -753,50 +721,45 @@ class _BusinessHtmlPageState extends State<BusinessHtmlPage> {
               )
             : null,
       ),
-      body: kIsWeb
-          // ✅ On Web: full styled HTML page inside iframe
-          ? HtmlElementView(viewType: widget.filename)
+      body: InAppWebView(
+        initialUrlRequest: URLRequest(url: Uri.parse(iframeUrl)),
+        initialOptions: InAppWebViewGroupOptions(
+          android: AndroidInAppWebViewOptions(useHybridComposition: true),
+          ios: IOSInAppWebViewOptions(allowsInlineMediaPlayback: true),
+          crossPlatform: InAppWebViewOptions(javaScriptEnabled: true),
+        ),
+        shouldOverrideUrlLoading: (controller, navigationAction) async {
+          final uri = navigationAction.request.url;
+          if (uri == null) return NavigationActionPolicy.CANCEL;
 
-          // ✅ On Mobile: load HTML from assets in InAppWebView
-          : InAppWebView(
-              initialUrlRequest: URLRequest(url: Uri.parse(iframeUrl)),
-              initialOptions: InAppWebViewGroupOptions(
-                android: AndroidInAppWebViewOptions(useHybridComposition: true),
-                ios: IOSInAppWebViewOptions(allowsInlineMediaPlayback: true),
-                crossPlatform: InAppWebViewOptions(javaScriptEnabled: true),
-              ),
-              shouldOverrideUrlLoading: (controller, navigationAction) async {
-                final uri = navigationAction.request.url;
-                if (uri == null) return NavigationActionPolicy.CANCEL;
+          // Handle Phone / Email / SMS
+          final scheme = uri.scheme.toLowerCase();
+          if (scheme == 'tel' || scheme == 'mailto' || scheme == 'sms') {
+            await _openExternally(uri.toString());
+            return NavigationActionPolicy.CANCEL;
+          }
 
-                // Handle Phone / Email / SMS
-                final scheme = uri.scheme.toLowerCase();
-                if (scheme == 'tel' || scheme == 'mailto' || scheme == 'sms') {
-                  await _openExternally(uri.toString());
-                  return NavigationActionPolicy.CANCEL;
-                }
+          // Handle Google Maps Links
+          if (uri.toString().contains('maps.google') ||
+              uri.toString().contains('google.com/maps') ||
+              uri.host.toLowerCase().contains('maps')) {
+            await _openExternally(uri.toString());
+            return NavigationActionPolicy.CANCEL;
+          }
 
-                // Handle Google Maps Links
-                if (uri.toString().contains('maps.google') ||
-                    uri.toString().contains('google.com/maps') ||
-                    uri.host.toLowerCase().contains('maps')) {
-                  await _openExternally(uri.toString());
-                  return NavigationActionPolicy.CANCEL;
-                }
-
-                return NavigationActionPolicy.ALLOW;
-              },
-              onLoadError: (controller, url, code, message) {
-                setState(() {
-                  error = "Load error: $message";
-                });
-              },
-              onLoadHttpError: (controller, url, code, message) {
-                setState(() {
-                  error = "HTTP error $code: $message";
-                });
-              },
-            ),
+          return NavigationActionPolicy.ALLOW;
+        },
+        onLoadError: (controller, url, code, message) {
+          setState(() {
+            error = "Load error: $message";
+          });
+        },
+        onLoadHttpError: (controller, url, code, message) {
+          setState(() {
+            error = "HTTP error $code: $message";
+          });
+        },
+      ),
     );
   }
 }
