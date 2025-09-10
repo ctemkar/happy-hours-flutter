@@ -63,21 +63,21 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     address_line1 = safe(business.get("address_line1", "")) if business else ""
     about_html = business.get("about_html", "") if business and business.get("about_html") else ""
 
-    # Phone from happy_hours_global (supports both 'Telephone' or 'telephone')
+    # Phone from happy_hours_global
     telephone = ""
     if global_row:
         telephone = safe(global_row.get("Telephone") or global_row.get("telephone") or "")
 
-    # opening hours first record fallback
-    if opening_hours and len(opening_hours) > 0:
+    # Opening hours fallback
+    if opening_hours:
         first_open = opening_hours[0]
         open_time = safe(first_open.get("open_time", ""))
         close_time = safe(first_open.get("close_time", ""))
     else:
         open_time = close_time = ""
 
-    # happy hours first record fallback
-    if happy_hours and len(happy_hours) > 0:
+    # Happy hours fallback
+    if happy_hours:
         first_hh = happy_hours[0]
         hh_start = safe(first_hh.get("start_time", ""))
         hh_end = safe(first_hh.get("end_time", ""))
@@ -85,37 +85,28 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     else:
         hh_start = hh_end = hh_description = ""
 
-    # photo
+    # Photo
     photo_url = safe(photos[0].get("url")) if photos else "https://placehold.co/400x300/f3f4f6/6b7280?text=Venue+Photos"
 
-    # address short (first 3 words)
+    # Address short (first 3 words)
     address_short = " ".join(address_line1.split()[:3]) if address_line1 else ""
 
-    # map url
+    # Map url
     map_url = embed_map_url(address_line1)
 
-    # Opening hours list (map to weekdays; if fewer rows, repeat first)
+    # Opening hours list
     weekdays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
     days_html = ""
     if opening_hours:
         for i, day in enumerate(weekdays):
             if i < len(opening_hours):
                 row = opening_hours[i]
-                days_html += (
-                    f'          <li class="hours-row"><span class="day">{day}</span>'
-                    f'<span class="time">{safe(row.get("open_time",""))} – {safe(row.get("close_time",""))}</span></li>\n'
-                )
+                days_html += f'<li class="hours-row"><span class="day">{day}</span><span class="time">{safe(row.get("open_time",""))} – {safe(row.get("close_time",""))}</span></li>\n'
             else:
-                days_html += (
-                    f'          <li class="hours-row"><span class="day">{day}</span>'
-                    f'<span class="time">{open_time} – {close_time}</span></li>\n'
-                )
+                days_html += f'<li class="hours-row"><span class="day">{day}</span><span class="time">{open_time} – {close_time}</span></li>\n'
     else:
         for day in weekdays:
-            days_html += (
-                f'          <li class="hours-row"><span class="day">{day}</span>'
-                f'<span class="time">{open_time} – {close_time}</span></li>\n'
-            )
+            days_html += f'<li class="hours-row"><span class="day">{day}</span><span class="time">{open_time} – {close_time}</span></li>\n'
 
     # Offers HTML
     offers_html = ""
@@ -123,19 +114,19 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
         for o in offers:
             title = safe(o.get("title",""))
             desc = safe(o.get("description",""))
-            offers_html += f'          <li><span>{title}</span><span class="badge">{desc}</span></li>\n'
+            offers_html += f'<li><span>{title}</span><span class="badge">{desc}</span></li>\n'
     else:
-        offers_html = '          <li><span>No current offers</span><span class="muted">—</span></li>\n'
+        offers_html = '<li><span>No current offers</span><span class="muted">—</span></li>\n'
 
-    # Good to know HTML (with label normalized to end with ": ")
+    # Good to know HTML
     gtk_html = ""
     if good_to_know:
         for g in good_to_know:
             label = _format_label(safe(g.get("label","")))
             value = safe(g.get("value",""))
-            gtk_html += f'          <li class="gtk-item"><span class="gtk-label">{label}</span><span class="gtk-value">{value}</span></li>\n'
+            gtk_html += f'<li class="gtk-item"><span class="gtk-label">{label}</span><span class="gtk-value">{value}</span></li>\n'
     else:
-        gtk_html = '          <li class="gtk-item"><span class="gtk-label">Info: </span><span class="gtk-value">—</span></li>\n'
+        gtk_html = '<li class="gtk-item"><span class="gtk-label">Info: </span><span class="gtk-value">—</span></li>\n'
 
     # Compose HTML
     html = f"""<!DOCTYPE html>
@@ -150,16 +141,37 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     :root{{--card:#f9fafb;--muted:#6b7280;--brand-2:#12a56a;--shadow:0 2px 8px rgba(0,0,0,0.08);--radius:12px}}
     *{{box-sizing:border-box}}
     html,body{{height:100%}}
-    body{{margin:0;font-family:Inter,system-ui,Arial;color:#1f2937;background:#fff;line-height:1.6;padding-top:68px}}
+    html{{scroll-padding-top:110px}} /* prevent sticky header from hiding titles */
+    body{{margin:0;font-family:Inter,system-ui,Arial;color:#1f2937;background:#fff;line-height:1.6;padding-top:120px}}
     a{{color:#2563eb;text-decoration:none}}
     .container{{width:min(1120px,92vw);margin:0 auto;padding:0 12px}}
 
-    /* Fixed top header */
-    header{{position:fixed;top:0;left:0;right:0;z-index:999;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 4px rgba(0,0,0,0.04)}}
-    .nav{{display:flex;align-items:center;justify-content:space-between;padding:12px 0}}
-    .brand{{font-weight:800}}
-    .nav-links a{{color:var(--muted);margin:0 6px}}
+    /* Fixed two-line header */
+    header{{position:fixed;top:0;left:0;right:0;z-index:999;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 4px rgba(0,0,0,0.04);display:flex;flex-direction:column}}
+    .header-top{{font-weight:800;font-size:20px;text-align:center;padding:10px 0;border-bottom:1px solid #e5e7eb}}
+    .nav{{display:flex;justify-content:center;padding:10px 0}}
+    
+    /* wrapper enables scroll */
+    .nav-wrapper {{
+      overflow-x: auto;                  /* horizontal scroll */
+      -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
+      width: 100%;
+    }}
+
+    .nav-links{{display:flex;gap:16px;flex-wrap:nowrap;white-space:nowrap;padding: 0 8px;}}
+    
+    .nav-wrapper::-webkit-scrollbar {{
+        display: none; /* hide scrollbar */
+      }}
+
+    .nav-links a{{color:var(--muted);text-decoration:none;font-size:15px;padding:6px 10px;flex-shrink:0}}
     .nav-links a:hover{{text-decoration:underline}}
+
+    /* Mobile adjustments */
+    @media (max-width:600px){{
+      .nav-links{{gap:12px}}
+      .nav-links a{{font-size:14px;padding:4px 8px}}
+    }}
 
     .hero{{padding:48px 0}}
     .hero-card{{background:var(--card);border-radius:20px;padding:22px;display:grid;grid-template-columns:1.6fr 1fr;gap:18px;box-shadow:var(--shadow)}}
@@ -171,19 +183,16 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     .card{{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:14px}}
     .grid{{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}}
 
-    /* Generic list */
     .list{{list-style:none;padding:0;margin:10px 0 0}}
     .muted{{color:var(--muted)}}
     .badge{{font-size:12px;padding:6px 8px;border-radius:8px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0}}
 
-    /* Opening Hours: dedicated list to ensure styling applies */
     .hours-list{{list-style:none;padding:0;margin:10px 0 0}}
     .hours-row{{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px dashed #e5e7eb}}
     .hours-row:last-child{{border-bottom:none}}
     .day{{font-weight:500}}
     .time{{margin-left:auto;text-align:right;color:#1f2937}}
 
-    /* Good to Know: vertical spacing + label formatting */
     .gtk-list{{list-style:none;padding:0;margin:10px 0 0}}
     .gtk-item{{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px dashed #e5e7eb}}
     .gtk-item:last-child{{border-bottom:none}}
@@ -193,24 +202,25 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     .map{{width:100%;height:280px;border:0;border-radius:12px}}
     footer{{color:var(--muted);padding:18px 0}}
 
-    @media (max-width:900px){{
-      .hero-card{{grid-template-columns:1fr}}
-      .grid{{grid-template-columns:1fr}}
-      body{{padding-top:76px}}
-    }}
+    @media (max-width:900px){{.hero-card{{grid-template-columns:1fr}}.grid{{grid-template-columns:1fr}}body{{padding-top:130px}}}}
   </style>
 </head>
 <body>
   <header>
-    <div class="container nav">
-      <div class="brand">Bangkok Happy Hours</div>
-      <nav class="nav-links">
-        <a href="#about">About</a> •
-        <a href="#hours">Hours</a> •
-        <a href="#happy">Happy Hour</a> •
-        <a href="#offers">Offers</a>
-      </nav>
-    </div>
+    <div class="header-top">Bangkok Happy Hours</div>
+    <nav class="nav">
+      <div class="nav-wrapper">
+        <div class="nav-links">
+          <a href="#about">About</a>
+          <a href="#hours">Hours</a>
+          <a href="#happyhour">Happy Hour</a>
+          <a href="#offers">Offers</a>
+          <a href="#map">Map</a>
+          <a href="#contact">Contact</a>
+          <a href="#goodtoknow">Good To Know</a>
+        </div>
+      </div>
+    </nav>
   </header>
 
   <main>
@@ -245,7 +255,7 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
       </aside>
     </section>
 
-    <section id="happy" class="container grid">
+    <section id="happyhour" class="container grid">
       <article class="card">
         <h3>Happy Hour</h3>
         <p class="meta muted">{hh_description}</p>
@@ -279,7 +289,7 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
       </aside>
     </section>
 
-    <section class="container" style="margin-top:14px">
+    <section id="goodtoknow" class="container" style="margin-top:14px">
       <div class="card">
         <h3>Good to Know</h3>
         <ul class="gtk-list">
