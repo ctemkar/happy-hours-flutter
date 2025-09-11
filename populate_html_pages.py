@@ -151,27 +151,91 @@ def build_html(name, business, opening_hours, happy_hours, photos, offers, good_
     .header-top{{font-weight:800;font-size:20px;text-align:center;padding:10px 0;border-bottom:1px solid #e5e7eb}}
     .nav{{display:flex;justify-content:center;padding:10px 0}}
     
-    /* wrapper enables scroll */
-    .nav-wrapper {{
-      overflow-x: auto;                  /* horizontal scroll */
-      -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
-      width: 100%;
-    }}
+    /* wrapper enables scroll with fade effect */
+.nav-wrapper {{
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  scrollbar-width: none; /* Firefox */
+}}
+.nav-wrapper::-webkit-scrollbar {{
+  display: none; /* Chrome/Safari */
+}}
 
-    .nav-links{{display:flex;gap:16px;flex-wrap:nowrap;white-space:nowrap;padding: 0 8px;}}
-    
-    .nav-wrapper::-webkit-scrollbar {{
-        display: none; /* hide scrollbar */
-      }}
+/* fade shadows on sides */
+.nav-wrapper::before,
+.nav-wrapper::after {{
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  z-index: 5;
+}}
+.nav-wrapper::before {{
+  left: 0;
+  background: linear-gradient(to right, white 40%, transparent);
+}}
+.nav-wrapper::after {{
+  right: 0;
+  background: linear-gradient(to left, white 40%, transparent);
+}}
 
-    .nav-links a{{color:var(--muted);text-decoration:none;font-size:15px;padding:6px 10px;flex-shrink:0}}
-    .nav-links a:hover{{text-decoration:underline}}
+/* links */
+.nav-links {{
+  display: flex;
+  gap: 20px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding: 0 16px;
+}}
+/* Menu links */
+.nav-links a {{
+  flex-shrink: 0;
+  background: #ffffff;       /* white pill */
+  color: #9333ea;           /* purple text */
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 0 0 1px #e5d4ff; /* subtle purple border */
+}}
 
-    /* Mobile adjustments */
-    @media (max-width:600px){{
-      .nav-links{{gap:12px}}
-      .nav-links a{{font-size:14px;padding:4px 8px}}
-    }}
+/* Hover effect */
+.nav-links a:hover {{
+  background: #9333ea;      /* purple background on hover */
+  color: #ffffff;            /* white text on hover */
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.4); /* subtle glow */
+}}
+
+/* Underline animation for hover/active */
+.nav-links a::after {{
+  content: "";
+  display: block;
+  height: 2px;
+  width: 0;
+  background: #ffffff; /* white underline when hovered */
+  transition: width 0.3s;
+  margin-top: 4px;
+  border-radius: 2px;
+}}
+.nav-links a:hover::after {{
+  width: 100%;
+}}
+
+/* mobile tweaks */
+@media (max-width:600px) {{
+  .nav-links {{
+    gap: 14px;
+  }}
+  .nav-links a {{
+    font-size: 14px;
+    padding: 6px 10px;
+  }}
+}}
 
     .hero{{padding:48px 0}}
     .hero-card{{background:var(--card);border-radius:20px;padding:22px;display:grid;grid-template-columns:1.6fr 1fr;gap:18px;box-shadow:var(--shadow)}}
