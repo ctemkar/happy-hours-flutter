@@ -18,10 +18,17 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController businessNameController = TextEditingController();
   final TextEditingController categoryController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
+  final TextEditingController countryController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController pinController = TextEditingController();
+  final TextEditingController openHoursController = TextEditingController();
+  final TextEditingController happyHourStartController = TextEditingController();
+  final TextEditingController happyHourEndController = TextEditingController();
+  final TextEditingController happyHoursYesNoController = TextEditingController();
+  final TextEditingController remarkController = TextEditingController();
   final TextEditingController latitudeController = TextEditingController();
   final TextEditingController longitudeController = TextEditingController();
 
@@ -47,8 +54,10 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Business Registration",
-        style: TextStyle(color: Colors.white),),
+        title: const Text(
+          "Business Registration",
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFF6a0dad),
         centerTitle: true,
       ),
@@ -76,25 +85,33 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
                 _buildTextField(controller: emailController, label: "Email", icon: Icons.email, keyboardType: TextInputType.emailAddress),
                 _buildTextField(controller: phoneController, label: "Phone", icon: Icons.phone, keyboardType: TextInputType.phone),
 
-                const SizedBox(height: 10),
                 const Divider(),
 
                 // Business Details
                 _buildTextField(controller: businessNameController, label: "Business Name", icon: Icons.store),
                 _buildTextField(controller: categoryController, label: "Business Category", icon: Icons.category),
-                _buildTextField(controller: addressController, label: "Address", icon: Icons.location_on),
+                _buildTextField(controller: descriptionController, label: "Business Description", icon: Icons.description, keyboardType: TextInputType.multiline,
+),              _buildTextField(controller: addressController, label: "Address", icon: Icons.location_on),
                 _buildTextField(controller: cityController, label: "City", icon: Icons.location_city),
+                _buildTextField(controller: countryController, label: "Country", icon: Icons.flag),
                 _buildTextField(controller: stateController, label: "State", icon: Icons.map),
                 _buildTextField(controller: pinController, label: "PIN Code", icon: Icons.pin, keyboardType: TextInputType.number),
 
-                const SizedBox(height: 10),
+                const Divider(),
+
+                // Hours
+                _buildTextField(controller: openHoursController, label: "Open Hours", icon: Icons.access_time),
+                _buildTextField(controller: happyHourStartController, label: "Happy Hour Start", icon: Icons.timer),
+                _buildTextField(controller: happyHourEndController, label: "Happy Hour End", icon: Icons.timer_off),
+                _buildTextField(controller: happyHoursYesNoController, label: "Happy Hours Available (Yes/No)", icon: Icons.event_available),
+                _buildTextField(controller: remarkController, label: "Remarks", icon: Icons.note),
+
                 const Divider(),
 
                 // Location
-                _buildTextField(controller: latitudeController, label: "Latitude (optional)", icon: Icons.my_location),
-                _buildTextField(controller: longitudeController, label: "Longitude (optional)", icon: Icons.location_searching),
+                _buildTextField(controller: latitudeController, label: "Latitude", icon: Icons.my_location),
+                _buildTextField(controller: longitudeController, label: "Longitude", icon: Icons.location_searching),
 
-                const SizedBox(height: 10),
                 const Divider(),
 
                 // Upload Photos
@@ -108,9 +125,10 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Business Registered Successfully!")),
+                        const SnackBar(content: Text("Business Registered Successfully! Verification email sent.")),
                       );
-                      // TODO: send data + files to PHP backend
+                      // TODO: Send data + files to PHP backend
+                      // TODO: PHP will send verification email with link
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -175,9 +193,7 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
           children: [
             ElevatedButton.icon(
               onPressed: onPick,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6a0dad),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6a0dad)),
               icon: const Icon(Icons.upload, color: Colors.white),
               label: const Text("Choose File", style: TextStyle(color: Colors.white)),
             ),
