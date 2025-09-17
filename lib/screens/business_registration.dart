@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class BusinessRegistrationPage extends StatefulWidget {
   const BusinessRegistrationPage({super.key});
@@ -32,21 +32,47 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   final TextEditingController latitudeController = TextEditingController();
   final TextEditingController longitudeController = TextEditingController();
 
-  File? businessPhoto;
-  File? licensePhoto;
+  Future<void> registerBusiness() async {
+    final uri = Uri.parse(
+        "https://customercallsapp.com/prod/customercallsapp/business_registration.php");
 
-  final ImagePicker _picker = ImagePicker();
+    final body = {
+      "businessName": businessNameController.text,
+      "ownerName": nameController.text,
+      "email": emailController.text,
+      "phone": phoneController.text,
+      "address": addressController.text,
+      "city": cityController.text,
+      "state": stateController.text,
+      "country": countryController.text,
+      "pin": pinController.text,
+      "category": categoryController.text,
+      "description": descriptionController.text,
+      "open_hours": openHoursController.text,
+      "happy_hour_start": happyHourStartController.text,
+      "happy_hour_end": happyHourEndController.text,
+      "happy_hour_yes_no": happyHoursYesNoController.text,
+      "remark": remarkController.text,
+      "latitude": latitudeController.text,
+      "longitude": longitudeController.text,
+    };
 
-  Future<void> _pickImage(bool isBusinessPhoto) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        if (isBusinessPhoto) {
-          businessPhoto = File(picked.path);
-        } else {
-          licensePhoto = File(picked.path);
-        }
-      });
+    try {
+      final response = await http.post(uri, body: body);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? "Server responded.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
@@ -54,10 +80,7 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Business Registration",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Business Registration", style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF6a0dad),
         centerTitle: true,
       ),
@@ -80,18 +103,16 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
                 ),
                 const SizedBox(height: 20),
 
-                // Owner Details
                 _buildTextField(controller: nameController, label: "Full Name", icon: Icons.person),
                 _buildTextField(controller: emailController, label: "Email", icon: Icons.email, keyboardType: TextInputType.emailAddress),
                 _buildTextField(controller: phoneController, label: "Phone", icon: Icons.phone, keyboardType: TextInputType.phone),
 
                 const Divider(),
 
-                // Business Details
                 _buildTextField(controller: businessNameController, label: "Business Name", icon: Icons.store),
                 _buildTextField(controller: categoryController, label: "Business Category", icon: Icons.category),
-                _buildTextField(controller: descriptionController, label: "Business Description", icon: Icons.description, keyboardType: TextInputType.multiline,
-),              _buildTextField(controller: addressController, label: "Address", icon: Icons.location_on),
+                _buildTextField(controller: descriptionController, label: "Business Description", icon: Icons.description),
+                _buildTextField(controller: addressController, label: "Address", icon: Icons.location_on),
                 _buildTextField(controller: cityController, label: "City", icon: Icons.location_city),
                 _buildTextField(controller: countryController, label: "Country", icon: Icons.flag),
                 _buildTextField(controller: stateController, label: "State", icon: Icons.map),
@@ -99,7 +120,6 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
 
                 const Divider(),
 
-                // Hours
                 _buildTextField(controller: openHoursController, label: "Open Hours", icon: Icons.access_time),
                 _buildTextField(controller: happyHourStartController, label: "Happy Hour Start", icon: Icons.timer),
                 _buildTextField(controller: happyHourEndController, label: "Happy Hour End", icon: Icons.timer_off),
@@ -108,35 +128,21 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
 
                 const Divider(),
 
-                // Location
                 _buildTextField(controller: latitudeController, label: "Latitude", icon: Icons.my_location),
                 _buildTextField(controller: longitudeController, label: "Longitude", icon: Icons.location_searching),
 
-                const Divider(),
-
-                // Upload Photos
-                _buildFilePicker("Upload Business Photo", businessPhoto, () => _pickImage(true)),
-                _buildFilePicker("Upload Legal Document", licensePhoto, () => _pickImage(false)),
-
                 const SizedBox(height: 30),
 
-                // Register Button
                 ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Business Registered Successfully! Verification email sent.")),
-                      );
-                      // TODO: Send data + files to PHP backend
-                      // TODO: PHP will send verification email with link
+                      registerBusiness();
                     }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6a0dad),
                     padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text(
                     "Register",
@@ -151,7 +157,6 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
     );
   }
 
-  // Text Field Widget
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -172,43 +177,8 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return "Please enter $label";
-          }
-          return null;
-        },
+        validator: (value) => value == null || value.isEmpty ? "Please enter $label" : null,
       ),
-    );
-  }
-
-  // File Upload Widget
-  Widget _buildFilePicker(String label, File? file, VoidCallback onPick) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF6a0dad))),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: onPick,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6a0dad)),
-              icon: const Icon(Icons.upload, color: Colors.white),
-              label: const Text("Choose File", style: TextStyle(color: Colors.white)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                file != null ? file.path.split('/').last : "No file selected",
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 15),
-      ],
     );
   }
 }
