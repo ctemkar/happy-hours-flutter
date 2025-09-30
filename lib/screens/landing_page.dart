@@ -11,7 +11,7 @@ class LandingPage extends StatelessWidget {
     if (role == "user") {
       Navigator.pushReplacementNamed(context, "/userHome");
     } else {
-      Navigator.pushReplacementNamed(context, "/businessRegistration");
+      Navigator.pushReplacementNamed(context, "/businessLogin");
     }
   }
 
@@ -78,7 +78,7 @@ class LandingPage extends StatelessWidget {
                       title: "Business Owner",
                       description:
                           "Register your business and showcase your happy hour offers to thousands of potential customers.",
-                      buttonText: "Register Now",
+                      buttonText: "Business Login",
                       role: "business",
                     ),
                   ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/happy_hours_screen_change.dart';
 import 'screens/landing_page.dart';
+import 'screens/business_login.dart';
 import 'screens/business_registration.dart';
 
 void main() {
@@ -53,6 +54,7 @@ class _HappyHoursAppState extends State<HappyHoursApp> {
       routes: {
         "/userHome": (context) => const HappyHoursScreen(),
         "/businessRegistration": (context) => const BusinessRegistrationPage(), 
+        "/businessLogin": (context) => const BusinessLoginPage(), // <-- add this
         "/landing": (context) => const LandingPage(),
       },
     );
