@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
-  Future<void> _setRole(BuildContext context, String role) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString("role", role);
-
+  void _navigateTo(BuildContext context, String role) {
     if (role == "user") {
       Navigator.pushReplacementNamed(context, "/userHome");
     } else {
@@ -46,7 +42,7 @@ class LandingPage extends StatelessWidget {
                 const SizedBox(height: 15),
                 const Text(
                   "Select your portal below. If you’re a user, explore amazing happy hour deals near you.\n"
-                  "If you’re a business owner, register your business and showcase your offers.",
+                  "If you’re a business owner, login and showcase your offers.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -77,7 +73,7 @@ class LandingPage extends StatelessWidget {
                       context,
                       title: "Business Owner",
                       description:
-                          "Register your business and showcase your happy hour offers to thousands of potential customers.",
+                          "Login to manage your business profile and showcase your happy hour offers.",
                       buttonText: "Business Login",
                       role: "business",
                     ),
@@ -99,7 +95,7 @@ class LandingPage extends StatelessWidget {
     required String role,
   }) {
     return InkWell(
-      onTap: () => _setRole(context, role),
+      onTap: () => _navigateTo(context, role),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 280,
@@ -137,7 +133,7 @@ class LandingPage extends StatelessWidget {
             ),
             const SizedBox(height: 25),
             ElevatedButton(
-              onPressed: () => _setRole(context, role),
+              onPressed: () => _navigateTo(context, role),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6a0dad),
                 padding:
