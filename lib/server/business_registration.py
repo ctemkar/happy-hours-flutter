@@ -13,20 +13,17 @@ import logging
 DB_HOST = "87.106.214.100"
 DB_USER = "happyuser"
 DB_PASS = "HappyUser@2025"
-DB_NAME = "intervhappy_hours_businesses"   # you used this in your original file
+DB_NAME = "happy_hours_businesses"
 
-# External services
-TEXTBEE_URL = "http://192.168.0.100:8080/sms/send"  # reachable only if on same LAN
+# External services (best-effort)
+TEXTBEE_URL = "http://192.168.0.100:8080/sms/send"  # reachable only if same LAN
 TEXTBEE_API_KEY = "1bccf6bf-4e98-4ad6-899d-2ce9f48d5234"
 
 FROM_EMAIL = "no-reply@app.lovehappyhours.com"
 SMTP_SERVER = "localhost"
 SMTP_PORT = 25
 
-# Optional: verification link under your own domain (update if needed)
 VERIFY_LINK_BASE = "https://customercallsapp.com/prod/customercallsapp/verified.php"
-# Example if you later move it:
-# VERIFY_LINK_BASE = "https://app.lovehappyhours.com/verify"
 
 # ================== Logger ==================
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +37,42 @@ def logMessage(message: str):
     except Exception:
         logger.info(message)
 
-# ================== SMS Sender ==================
+# ================== Helpers ==================
+def as_text(v, default=""):
+    if v is None:
+        return default
+    return str(v).strip()
+
+def none_if_empty(v):
+    s = as_text(v, "")
+    return None if s == "" else s
+
+def to_int_yes_no(value):
+    if value is None:
+        return None
+    v = as_text(value).lower()
+    if v in ("yes", "y", "true", "1"):
+        return 1
+    if v in ("no", "n", "false", "0"):
+        return 0
+    # numeric fallback
+    try:
+        return 1 if int(float(v)) != 0 else 0
+    except Exception:
+        return 0
+
+def get_db_connection():
+    return pymysql.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME,
+        cursorclass=pymysql.cursors.DictCursor,
+        charset="utf8mb4",
+        autocommit=False,
+    )
+
+# ================== SMS Sender (best-effort) ==================
 def sendSMS_TextBee(toPhone: str, textMessage: str) -> bool:
     try:
         payload = {"apikey": TEXTBEE_API_KEY, "to": toPhone, "message": textMessage}
@@ -55,69 +87,99 @@ def sendSMS_TextBee(toPhone: str, textMessage: str) -> bool:
         logMessage(f"❌ SMS send exception: {str(e)}")
         return False
 
-# ================== Route Function ==================
+# ================== Main Route Function ==================
 def business_registration():
     # Accept JSON or form-encoded
     data = request.get_json(silent=True) or (request.form.to_dict() if request.form else {})
     logMessage("POST data: " + str(data))
 
-    # Extract fields
-    businessName   = data.get('businessName', '').strip()
-    ownerName      = data.get('ownerName', '').strip()
-    email          = data.get('email', '').strip()
-    phone          = data.get('phone', '').strip()
-    address        = data.get('address', '').strip()
-    city           = data.get('city', '').strip()
-    state          = data.get('state', '').strip()
-    country        = data.get('country', '').strip()
-    pin            = data.get('pin', '').strip()
-    category       = data.get('category', '').strip()
-    description    = data.get('description', '').strip()
-    openHours      = data.get('open_hours', '').strip()
-    happyHourStart = data.get('happy_hour_start', '').strip()
-    happyHourEnd   = data.get('happy_hour_end', '').strip()
-    happyHourYesNo = data.get('happy_hour_yes_no', 'No').strip()
-    remark         = data.get('remark', '').strip()
-    latitude       = data.get('latitude', '').strip()
-    longitude      = data.get('longitude', '').strip()
+    # Extract and normalize inputs (safe for any type)
+    businessName     = as_text(data.get("businessName"))
+    ownerName        = as_text(data.get("ownerName"))
+    email            = as_text(data.get("email"))
+    phone            = as_text(data.get("phone"))
+    address          = as_text(data.get("address"))
+    city             = as_text(data.get("city"))
+    # Optional fields (not used in current INSERT)
+    state            = as_text(data.get("state"))
+    pin              = as_text(data.get("pin"))
+    country          = as_text(data.get("country"))
+    category         = as_text(data.get("category"))
+    description      = as_text(data.get("description"))
+    openHours        = as_text(data.get("open_hours"))
+    happyHourStart   = as_text(data.get("happy_hour_start"))
+    happyHourEnd     = as_text(data.get("happy_hour_end"))
+    happyHourYesNo   = to_int_yes_no(data.get("happy_hour_yes_no", "No"))  # -> 1/0/None
+    remark           = as_text(data.get("remark"))
 
-    # Basic validation (optional, expand as needed)
-    if not businessName or not ownerName or not email:
-        return jsonify({"status": "error", "message": "businessName, ownerName, and email are required"}), 400
+    # Numeric/nullable fields
+    latitude_raw     = data.get("latitude")
+    longitude_raw    = data.get("longitude")
+    latitude         = none_if_empty(latitude_raw)
+    longitude        = none_if_empty(longitude_raw)
 
-    token    = secrets.token_hex(16)
-    verified = 0
-    uniqID   = secrets.token_hex(8)
+    # Basic validation
+    required = {
+        "businessName": businessName,
+        "ownerName": ownerName,
+        "email": email,
+        "city": city,
+        "category": category,
+    }
+    missing = [k for k, v in required.items() if not v]
+    if missing:
+        return jsonify({"status": "error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    # IDs and flags
+    happy_hours_id = secrets.token_hex(8)  # VARCHAR PK/ID
+    token          = secrets.token_hex(16)
+    verified       = 0
+
+    # IMPORTANT: Column names now use business_category (lowercase) and VARCHAR happy_hours_id.
+    sql = """
+        INSERT INTO happy_hours_global_test
+        (happy_hours_id, owner_name, email, Name, Description, Address, business_category, city, country, Open_hours,
+         Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, Telephone, Remark, latitude, longitude, token, verified)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """
+
+    params = (
+        happy_hours_id,     # VARCHAR id
+        ownerName,
+        email,
+        businessName,
+        description,
+        address,
+        category,           # business_category (lowercase)
+        city,
+        country,
+        openHours,
+        happyHourStart,
+        happyHourEnd,
+        happyHourYesNo,     # int 1/0/None
+        phone,
+        remark,
+        latitude,           # None if empty
+        longitude,          # None if empty
+        token,
+        verified
+    )
 
     try:
-        # Connect to DB
-        conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, charset='utf8mb4')
-        cursor = conn.cursor()
+        conn = get_db_connection()
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, params)
+            conn.commit()
 
-        sql = """
-            INSERT INTO happy_hours_global_test
-            (happy_hours_id, owner_name, email, Name, Description, Address, business_category, city, country, Open_hours, 
-             Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, Telephone, Remark, latitude, longitude, token, verified) 
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """
+        logMessage(f"Insert successful for email: {email} (id={happy_hours_id})")
 
-        cursor.execute(sql, (
-            uniqID, ownerName, email, businessName, description, address, category, city, country,
-            openHours, happyHourStart, happyHourEnd, happyHourYesNo, phone, remark, latitude, longitude, token, verified
-        ))
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        logMessage(f"Insert successful for email: {email}")
-
-        # Send verification mail
-        verifyLink = f"{VERIFY_LINK_BASE}?email={email}&token={token}"
-        subject = "Verify Your Business Registration"
-        message_body = f"Hi {ownerName},\n\nPlease verify your business registration by clicking:\n{verifyLink}\n\nThank you!"
-
+        # Send verification email (best-effort)
         try:
+            verifyLink = f"{VERIFY_LINK_BASE}?email={email}&token={token}"
+            subject = "Verify Your Business Registration"
+            message_body = f"Hi {ownerName},\n\nPlease verify your business registration by clicking:\n{verifyLink}\n\nThank you!"
+
             msg = MIMEText(message_body)
             msg["Subject"] = subject
             msg["From"] = FROM_EMAIL
@@ -128,7 +190,7 @@ def business_registration():
 
             logMessage(f"Mail sent to {email}")
 
-            # Send SMS via TextBee (best effort)
+            # Send SMS via TextBee (best-effort)
             if phone:
                 smsMessage = f"Hi {ownerName}! A verification email has been sent to {email}. Please check your inbox to activate your business registration."
                 sendSMS_TextBee(phone, smsMessage)
@@ -136,8 +198,8 @@ def business_registration():
         except Exception as e:
             logMessage(f"Mail/SMS step failed for {email}: {str(e)}")
 
-        return jsonify({"status": "success", "message": "Business registered successfully. Verification email & SMS sent."})
+        return jsonify({"status": "success", "message": "Business registered successfully. Verification email & SMS sent.", "id": happy_hours_id}), 200
 
     except Exception as e:
-        logMessage(f"DB insert failed: {str(e)}")
-        return jsonify({"status": "error", "message": "DB insert failed."}), 500
+        logMessage(f"DB insert failed: {repr(e)}")
+        return jsonify({"status": "error", "message": f"DB insert failed: {str(e)}"}), 500

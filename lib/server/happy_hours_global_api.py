@@ -3,7 +3,7 @@
 happy_hours_global_api.py
 Flask API for Happy Hours listing (Python replacement for the PHP endpoint)
 """
-
+from business_registration import business_registration as br_handler
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
@@ -141,8 +141,10 @@ def happy_hours_api():
         return jsonify(data), 200
 
     except Exception as e:
-        logger.exception(f"Error processing request: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        #logger.exception(f"Error processing request: {e}")
+        #return jsonify({"error": "Internal server error"}), 500
+        print(f"DB insert failed: {str(e)}")
+        return jsonify({"status": "error", "message": f"DB insert failed: {str(e)}"}), 500
 
     finally:
         try:
@@ -150,6 +152,12 @@ def happy_hours_api():
         except Exception:
             pass
 
+# add this route
+@app.route('/business_registration', methods=['POST', 'OPTIONS'])
+def business_registration_route():
+    if request.method == 'OPTIONS':
+        return '', 200
+    return br_handler()
 
 @app.errorhandler(404)
 def not_found(e):
