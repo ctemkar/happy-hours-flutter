@@ -141,10 +141,8 @@ def happy_hours_api():
         return jsonify(data), 200
 
     except Exception as e:
-        #logger.exception(f"Error processing request: {e}")
-        #return jsonify({"error": "Internal server error"}), 500
-        print(f"DB insert failed: {str(e)}")
-        return jsonify({"status": "error", "message": f"DB insert failed: {str(e)}"}), 500
+        print(f"DB query failed: {str(e)}")
+        return jsonify({"status": "error", "message": f"DB query failed: {str(e)}"}), 500
 
     finally:
         try:
@@ -152,12 +150,90 @@ def happy_hours_api():
         except Exception:
             pass
 
-# add this route
+
 @app.route('/business_registration', methods=['POST', 'OPTIONS'])
 def business_registration_route():
+    """Business registration endpoint"""
     if request.method == 'OPTIONS':
         return '', 200
     return br_handler()
+
+
+# ---- Business Login Routes ----
+def handle_business_login():
+    """Shared handler for business login logic"""
+    if request.method == "OPTIONS":
+        return ("", 204)
+    
+    if request.method == "GET":
+        return jsonify({"ok": True, "message": "business_login endpoint is alive. Use POST with JSON."}), 200
+
+    # POST logic
+    data = request.get_json(silent=True) or {}
+    email = data.get("email")
+    
+    if not email:
+        return jsonify({"success": False, "message": "Email required"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"success": False, "message": "Database connection failed"}), 500
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT `Name` FROM `happy_hours_global_test` WHERE `email`=%s LIMIT 1",
+                (email,)
+            )
+            row = cursor.fetchone()
+        
+        if row:
+            return jsonify({
+                "success": True,
+                "message": "Login successful",
+                "business_name": row["Name"]
+            }), 200
+        else:
+            return jsonify({"success": False, "message": "Email not found"}), 404
+
+    except Exception as e:
+        logger.exception(f"Business login error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+# Expose BOTH routes so either Nginx strategy works
+@app.route("/happy-hours-api/business_login", methods=["GET", "POST", "OPTIONS"])
+def business_login_prefixed():
+    """Business login with /happy-hours-api/ prefix"""
+    return handle_business_login()
+
+
+@app.route("/business_login", methods=["GET", "POST", "OPTIONS"])
+def business_login_unprefixed():
+    """Business login without prefix (for Nginx rewrite)"""
+    return handle_business_login()
+
+
+# Debug route to list all available routes (optional, remove in production)
+@app.route("/__routes__", methods=["GET"])
+def list_routes():
+    """List all registered routes for debugging"""
+    output = []
+    for rule in app.url_map.iter_rules():
+        methods = ",".join(sorted(rule.methods))
+        output.append({
+            "rule": str(rule),
+            "methods": methods,
+            "endpoint": rule.endpoint
+        })
+    return jsonify(output)
+
 
 @app.errorhandler(404)
 def not_found(e):
@@ -171,4 +247,5 @@ def internal_error(e):
 
 if __name__ == '__main__':
     # For development only
+    print("Flask starting from:", __file__)
     app.run(host='0.0.0.0', port=5000, debug=True)
