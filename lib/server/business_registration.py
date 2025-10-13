@@ -8,6 +8,7 @@ import os
 import datetime
 import secrets
 import logging
+import hashlib
 
 # ================== Config ==================
 DB_HOST = "87.106.214.100"
@@ -61,6 +62,10 @@ def to_int_yes_no(value):
     except Exception:
         return 0
 
+def md5_hash(password: str) -> str:
+    """Generate MD5 hash of password"""
+    return hashlib.md5(password.encode('utf-8')).hexdigest()
+
 def get_db_connection():
     return pymysql.connect(
         host=DB_HOST,
@@ -91,16 +96,17 @@ def sendSMS_TextBee(toPhone: str, textMessage: str) -> bool:
 def business_registration():
     # Accept JSON or form-encoded
     data = request.get_json(silent=True) or (request.form.to_dict() if request.form else {})
-    logMessage("POST data: " + str(data))
+    logMessage("POST data: " + str({k: v for k, v in data.items() if k != 'password'}))  # Don't log password
 
     # Extract and normalize inputs (safe for any type)
     businessName     = as_text(data.get("businessName"))
     ownerName        = as_text(data.get("ownerName"))
     email            = as_text(data.get("email"))
     phone            = as_text(data.get("phone"))
+    password         = as_text(data.get("password"))
     address          = as_text(data.get("address"))
     city             = as_text(data.get("city"))
-    # Optional fields (not used in current INSERT)
+    # Optional fields
     state            = as_text(data.get("state"))
     pin              = as_text(data.get("pin"))
     country          = as_text(data.get("country"))
@@ -123,6 +129,7 @@ def business_registration():
         "businessName": businessName,
         "ownerName": ownerName,
         "email": email,
+        "password": password,
         "city": city,
         "category": category,
     }
@@ -130,23 +137,31 @@ def business_registration():
     if missing:
         return jsonify({"status": "error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
 
+    # Validate password length
+    if len(password) < 6:
+        return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
+
+    # Hash the password using MD5
+    password_hash = md5_hash(password)
+
     # IDs and flags
     happy_hours_id = secrets.token_hex(8)  # VARCHAR PK/ID
     token          = secrets.token_hex(16)
     verified       = 0
 
-    # IMPORTANT: Column names now use business_category (lowercase) and VARCHAR happy_hours_id.
+    # SQL with password field
     sql = """
         INSERT INTO happy_hours_global_test
-        (happy_hours_id, owner_name, email, Name, Description, Address, business_category, city, country, Open_hours,
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, city, country, Open_hours,
          Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, Telephone, Remark, latitude, longitude, token, verified)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """
 
     params = (
         happy_hours_id,     # VARCHAR id
         ownerName,
         email,
+        password_hash,      # MD5 hashed password
         businessName,
         description,
         address,
@@ -169,6 +184,11 @@ def business_registration():
         conn = get_db_connection()
         with conn:
             with conn.cursor() as cursor:
+                # Check if email already exists
+                cursor.execute("SELECT email FROM happy_hours_global_test WHERE email = %s", (email,))
+                if cursor.fetchone():
+                    return jsonify({"status": "error", "message": "Email already registered"}), 400
+                
                 cursor.execute(sql, params)
             conn.commit()
 

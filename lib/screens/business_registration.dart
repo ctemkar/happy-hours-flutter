@@ -16,6 +16,8 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
   final TextEditingController businessNameController = TextEditingController();
   final TextEditingController categoryController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
@@ -32,15 +34,18 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
   final TextEditingController latitudeController = TextEditingController();
   final TextEditingController longitudeController = TextEditingController();
 
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
   Future<void> registerBusiness() async {
-    final uri = Uri.parse(
-        "https://customercallsapp.com/prod/customercallsapp/business_registration.php");
+    final uri = Uri.parse("https://app.lovehappyhours.com/happy-hours-api/business_registration");
 
     final body = {
       "businessName": businessNameController.text,
       "ownerName": nameController.text,
       "email": emailController.text,
       "phone": phoneController.text,
+      "password": passwordController.text,
       "address": addressController.text,
       "city": cityController.text,
       "state": stateController.text,
@@ -58,12 +63,42 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
     };
 
     try {
-      final response = await http.post(uri, body: body);
+      final response = await http.post(
+        uri,
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(body),
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['message'] ?? "Server responded.")),
         );
+        
+        // Clear form on success
+        if (data['status'] == 'success') {
+          _formKey.currentState?.reset();
+          nameController.clear();
+          emailController.clear();
+          phoneController.clear();
+          passwordController.clear();
+          confirmPasswordController.clear();
+          businessNameController.clear();
+          categoryController.clear();
+          descriptionController.clear();
+          addressController.clear();
+          cityController.clear();
+          countryController.clear();
+          stateController.clear();
+          pinController.clear();
+          openHoursController.clear();
+          happyHourStartController.clear();
+          happyHourEndController.clear();
+          happyHoursYesNoController.clear();
+          remarkController.clear();
+          latitudeController.clear();
+          longitudeController.clear();
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Server error: ${response.statusCode}")),
@@ -74,6 +109,31 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
         SnackBar(content: Text("Error: $e")),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    businessNameController.dispose();
+    categoryController.dispose();
+    descriptionController.dispose();
+    addressController.dispose();
+    cityController.dispose();
+    countryController.dispose();
+    stateController.dispose();
+    pinController.dispose();
+    openHoursController.dispose();
+    happyHourStartController.dispose();
+    happyHourEndController.dispose();
+    happyHoursYesNoController.dispose();
+    remarkController.dispose();
+    latitudeController.dispose();
+    longitudeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -106,6 +166,41 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
                 _buildTextField(controller: nameController, label: "Full Name", icon: Icons.person),
                 _buildTextField(controller: emailController, label: "Email", icon: Icons.email, keyboardType: TextInputType.emailAddress),
                 _buildTextField(controller: phoneController, label: "Phone", icon: Icons.phone, keyboardType: TextInputType.phone),
+                
+                // Password field
+                _buildPasswordField(
+                  controller: passwordController,
+                  label: "Password",
+                  icon: Icons.lock,
+                  obscureText: _obscurePassword,
+                  onToggleVisibility: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+                
+                // Confirm Password field
+                _buildPasswordField(
+                  controller: confirmPasswordController,
+                  label: "Confirm Password",
+                  icon: Icons.lock_outline,
+                  obscureText: _obscureConfirmPassword,
+                  onToggleVisibility: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Please confirm your password";
+                    }
+                    if (value != passwordController.text) {
+                      return "Passwords do not match";
+                    }
+                    return null;
+                  },
+                ),
 
                 const Divider(),
 
@@ -178,6 +273,48 @@ class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
           ),
         ),
         validator: (value) => value == null || value.isEmpty ? "Please enter $label" : null,
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
+    String? Function(String?)? validator,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF6a0dad)),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscureText ? Icons.visibility : Icons.visibility_off,
+              color: const Color(0xFF6a0dad),
+            ),
+            onPressed: onToggleVisibility,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: Color(0xFF6a0dad), width: 2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        validator: validator ?? (value) {
+          if (value == null || value.isEmpty) {
+            return "Please enter $label";
+          }
+          if (value.length < 6) {
+            return "Password must be at least 6 characters";
+          }
+          return null;
+        },
       ),
     );
   }

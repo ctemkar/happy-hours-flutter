@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
+import hashlib
 
 app = Flask(__name__)
 CORS(app)
@@ -20,6 +21,10 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+def md5_hash(password: str) -> str:
+    """Generate MD5 hash of password"""
+    return hashlib.md5(password.encode('utf-8')).hexdigest()
+
 def handle_business_login():
     if request.method == "OPTIONS":
         return ("", 204)
@@ -28,15 +33,23 @@ def handle_business_login():
 
     data = request.get_json(silent=True) or {}
     email = data.get("email")
+    password = data.get("password")
+    
     if not email:
         return jsonify({"success": False, "message": "Email required"}), 400
+    
+    if not password:
+        return jsonify({"success": False, "message": "Password required"}), 400
+
+    # Hash the password using MD5
+    password_hash = md5_hash(password)
 
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT `Name` FROM `happy_hours_global_test` WHERE `email`=%s LIMIT 1",
-                (email,)
+                "SELECT `Name` FROM `happy_hours_global_test` WHERE `email`=%s AND `password`=%s LIMIT 1",
+                (email, password_hash)
             )
             business = cursor.fetchone()
         conn.close()
@@ -48,7 +61,7 @@ def handle_business_login():
                 "business_name": business["Name"]
             }), 200
         else:
-            return jsonify({"success": False, "message": "Email not found"}), 404
+            return jsonify({"success": False, "message": "Invalid email or password"}), 401
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
