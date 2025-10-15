@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
 from urllib.parse import urlparse, quote
+from werkzeug.utils import secure_filename
 import os
 import logging
 
@@ -31,6 +32,11 @@ DB_CONFIG = {
 
 # Base URL for migrated images (public HTTPS URL you configured to serve images)
 BASE_URL = "https://app.lovehappyhours.com/business_images/"  # keep trailing slash
+
+# Directory to store edited HTML files
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+STORE_DIR = os.path.join(BASE_DIR, 'output_html_store')
+os.makedirs(STORE_DIR, exist_ok=True)
 
 
 def get_db_connection():
@@ -171,9 +177,17 @@ def handle_business_login():
     # POST logic
     data = request.get_json(silent=True) or {}
     email = data.get("email")
+    password = data.get("password")
     
     if not email:
         return jsonify({"success": False, "message": "Email required"}), 400
+    
+    if not password:
+        return jsonify({"success": False, "message": "Password required"}), 400
+
+    # Hash the password using MD5
+    import hashlib
+    password_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
 
     conn = get_db_connection()
     if not conn:
@@ -182,8 +196,8 @@ def handle_business_login():
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT `Name` FROM `happy_hours_global_test` WHERE `email`=%s LIMIT 1",
-                (email,)
+                "SELECT `Name` FROM `happy_hours_global_test` WHERE `email`=%s AND `password`=%s LIMIT 1",
+                (email, password_hash)
             )
             row = cursor.fetchone()
         
@@ -194,7 +208,7 @@ def handle_business_login():
                 "business_name": row["Name"]
             }), 200
         else:
-            return jsonify({"success": False, "message": "Email not found"}), 404
+            return jsonify({"success": False, "message": "Invalid email or password"}), 401
 
     except Exception as e:
         logger.exception(f"Business login error: {e}")
@@ -218,6 +232,178 @@ def business_login_prefixed():
 def business_login_unprefixed():
     """Business login without prefix (for Nginx rewrite)"""
     return handle_business_login()
+
+
+# ---- Business Page Update & Fetch Routes ----
+@app.route('/happy-hours-api/update_business', methods=['POST', 'OPTIONS'])
+def update_business():
+    """
+    Save edited business HTML page to disk.
+    Expects JSON: { business_name: str, content_html: str, email?: str }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.get_json(silent=True) or {}
+    business_name = (data.get('business_name') or '').strip()
+    content_html = data.get('content_html')
+    
+    if not business_name or not content_html:
+        return jsonify({
+            "success": False, 
+            "message": "business_name and content_html are required"
+        }), 400
+
+    filename = secure_filename(f"{business_name}.html")
+    out_path = os.path.join(STORE_DIR, filename)
+    
+    try:
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write(content_html)
+        
+        logger.info(f"✅ Saved business page: {filename}")
+        return jsonify({
+            "success": True, 
+            "message": "Updated successfully", 
+            "file": filename
+        }), 200
+    
+    except Exception as e:
+        logger.exception(f"Failed to save business page: {e}")
+        return jsonify({
+            "success": False, 
+            "message": str(e)
+        }), 500
+
+
+@app.route('/happy-hours-api/page', methods=['GET', 'OPTIONS'])
+def get_business_page():
+    """
+    Fetch saved business HTML page.
+    Query params: ?business_name=Exact%20Name
+    Returns the saved HTML if present; otherwise 404.
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    business_name = (request.args.get('business_name') or '').strip()
+    
+    if not business_name:
+        return jsonify({
+            "success": False, 
+            "message": "business_name query parameter is required"
+        }), 400
+
+    filename = secure_filename(f"{business_name}.html")
+    saved_path = os.path.join(STORE_DIR, filename)
+    
+    if os.path.exists(saved_path):
+        try:
+            with open(saved_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        except Exception as e:
+            logger.exception(f"Failed to read business page: {e}")
+            return jsonify({
+                "success": False, 
+                "message": str(e)
+            }), 500
+    else:
+        return jsonify({
+            "success": False, 
+            "message": "Page not found"
+        }), 404
+
+@app.route('/happy-hours-api/get_business', methods=['POST', 'OPTIONS'])
+def get_business_json():
+    """
+    JSON endpoint to fetch saved business HTML from filesystem.
+    Request JSON: { "business_name": "Exact Name" }
+    Returns JSON: { success, business_name, content_html, updated_at }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json(silent=True) or {}
+    business_name = (data.get('business_name') or '').strip()
+
+    if not business_name:
+        return jsonify({
+            "success": False,
+            "message": "business_name is required"
+        }), 400
+
+    filename = secure_filename(f"{business_name}.html")
+    saved_path = os.path.join(STORE_DIR, filename)
+
+    if not os.path.exists(saved_path):
+        return jsonify({
+            "success": False,
+            "message": f"Page not found for '{business_name}'"
+        }), 404
+
+    try:
+        with open(saved_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        from datetime import datetime
+        updated_at = datetime.fromtimestamp(os.path.getmtime(saved_path)).isoformat()
+
+        return jsonify({
+            "success": True,
+            "business_name": business_name,
+            "content_html": html_content,
+            "updated_at": updated_at
+        }), 200
+
+    except Exception as e:
+        logger.exception(f"Failed to read business page for JSON: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500        
+
+
+@app.route('/happy-hours-api/delete_business', methods=['POST', 'OPTIONS'])
+def delete_business():
+    """
+    Delete saved business HTML page from disk.
+    Expects JSON: { business_name: str, email?: str }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.get_json(silent=True) or {}
+    business_name = (data.get('business_name') or '').strip()
+    
+    if not business_name:
+        return jsonify({
+            "success": False, 
+            "message": "business_name is required"
+        }), 400
+
+    filename = secure_filename(f"{business_name}.html")
+    saved_path = os.path.join(STORE_DIR, filename)
+    
+    if os.path.exists(saved_path):
+        try:
+            os.remove(saved_path)
+            logger.info(f"🗑️ Deleted business page: {filename}")
+            return jsonify({
+                "success": True, 
+                "message": "Deleted successfully"
+            }), 200
+        except Exception as e:
+            logger.exception(f"Failed to delete business page: {e}")
+            return jsonify({
+                "success": False, 
+                "message": str(e)
+            }), 500
+    else:
+        return jsonify({
+            "success": False, 
+            "message": "Page not found"
+        }), 404
 
 
 # Debug route to list all available routes (optional, remove in production)

@@ -222,26 +222,45 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
   @override
   void initState() {
     super.initState();
-    _htmlFuture = _loadHtml(_filePathFromExactName(widget.businessName));
+    _htmlFuture = _loadHtml();
   }
 
-  String _filePathFromExactName(String exactName) {
-    final path = 'output_html/$exactName.html';
-    debugPrint('Business page asset path => $path');
-    return path;
-  }
+  // Try server first, fallback to local asset
+  Future<String> _loadHtml() async {
+    // 1. Try fetching from server
+    try {
+      final response = await http.post(
+        Uri.parse("https://app.lovehappyhours.com/happy-hours-api/get_business"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"business_name": widget.businessName}),
+      );
 
-  Future<String> _loadHtml(String path) async {
+      debugPrint('Server fetch response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["success"] == true && data["content_html"] != null) {
+          debugPrint('✅ Loaded HTML from server for ${widget.businessName}');
+          return data["content_html"] as String;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Server fetch failed: $e, falling back to asset');
+    }
+
+    // 2. Fallback to local asset
+    final path = 'output_html/${widget.businessName}.html';
     try {
       final html = await rootBundle.loadString(path);
+      debugPrint('✅ Loaded HTML from asset: $path');
       return html;
     } catch (e) {
-      debugPrint('Failed to load asset: $path, error: $e');
+      debugPrint('❌ Asset load failed: $path, error: $e');
       return """
         <html>
           <body style="font-family:sans-serif; padding:16px;">
             <h2 style='color:red; text-align:center;'>No page found for "${widget.businessName}".</h2>
-            <p style='text-align:center;'>Tried: $path</p>
+            <p style='text-align:center;'>Tried server and asset: $path</p>
             <pre>$e</pre>
           </body>
         </html>
@@ -250,7 +269,7 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
   }
 
   void _onEdit() async {
-    final html = await _htmlFuture; // pass current HTML for parsing
+    final html = await _htmlFuture;
     if (!mounted) return;
     Navigator.push(
       context,
@@ -259,9 +278,19 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
           businessName: widget.businessName,
           businessEmail: widget.businessEmail,
           initialHtml: html,
-          onSaved: () {
+          onSaved: (newHtml) {
+            // 1) Instant optimistic UI update with the HTML we just saved
             setState(() {
-              _htmlFuture = _loadHtml(_filePathFromExactName(widget.businessName));
+              //_htmlFuture = _loadHtml(); // Reload from server after save
+              _htmlFuture = Future.value(newHtml);
+            });
+            // 2) Background truth refresh from server to ensure consistency
+            Future.microtask(() {
+              if (mounted) {
+                setState(() {
+                  _htmlFuture = _loadHtml();
+                });
+              }
             });
           },
         ),
@@ -365,14 +394,15 @@ class BusinessStructuredEditPage extends StatefulWidget {
   final String businessName;
   final String? businessEmail;
   final String initialHtml;
-  final VoidCallback onSaved;
+  //final VoidCallback onSaved;
+  final void Function(String newHtml) onSaved;
 
   const BusinessStructuredEditPage({
     super.key,
     required this.businessName,
     this.businessEmail,
     required this.initialHtml,
-    required this.onSaved,
+    required this.onSaved, // now expects (String newHtml)
   });
 
   @override
@@ -777,16 +807,27 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
         body: jsonEncode(payload),
       );
 
+      debugPrint('Update response: ${resp.statusCode} ${resp.body}');
+
       final body = (resp.body.isNotEmpty) ? jsonDecode(resp.body) : null;
       final msg = (body is Map && body["message"] is String) ? body["message"] as String : null;
 
-      if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
+      /*if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg ?? "Saved successfully")),
+          SnackBar(content: Text(msg ?? "✅ Saved successfully")),
         );
-        widget.onSaved();
+        widget.onSaved(); // This triggers reload from server
         Navigator.pop(context);
+      } */
+      if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
+          if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(msg ?? "Saved successfully")),
+            );
+            // Pass the just-saved HTML up so parent can show it instantly
+            widget.onSaved(newHtml);
+            Navigator.pop(context);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

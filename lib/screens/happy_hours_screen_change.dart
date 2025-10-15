@@ -176,6 +176,8 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     });
 
     try {
+      // Add this line:
+      debugPrint('Calling fetchHappyHours(city: $city, business: $business)');
       final places = await fetchHappyHours(city: city, business: business);
       print('Fetch successful, received ${places.length} places');
       setState(() {
@@ -194,13 +196,21 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
           });
         }
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Fetch failed with error: $e');
+      debugPrint('Stacktrace: $st');
+      setState(() {
+        errorMessage = 'Failed to load data: $e';
+        isLoading = false;
+      });
+    }
+    /*catch (e) {
       print('Fetch failed with error: $e');
       setState(() {
         errorMessage = 'Failed to load data';
         isLoading = false;
       });
-    }
+    }*/
   }
 
   List<Marker> get _markers {
