@@ -119,8 +119,7 @@ def sanitize_row(row: dict) -> dict:
     return sanitized
 
 
-# Keep a php-like route for drop-in replacement, and the root path
-@app.route('/happy_hours_api.php', methods=['GET', 'OPTIONS'])
+# Root path only (PHP route removed)
 @app.route('/', methods=['GET', 'OPTIONS'])
 def happy_hours_api():
     """Main API endpoint"""
@@ -156,6 +155,39 @@ def happy_hours_api():
         except Exception:
             pass
 
+
+# NEW: Route that replicates the “business” API endpoint (without PHP filename)
+@app.route('/happy_hours_business', methods=['GET', 'OPTIONS'])
+def happy_hours_business():
+    """
+    Business API route (Python). Same behavior as root:
+      - ?city=ALL|ExactCity
+      - ?business=ALL|ExactCategory
+    Example:
+      /happy_hours_business?city=Bangkok&business=Bar
+    """
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    city = (request.args.get('city') or 'ALL').strip()
+    business = (request.args.get('business') or 'ALL').strip()
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        results = get_happy_hours(conn, city, business)
+        data = [sanitize_row(row) for row in results]
+        return jsonify(data), 200
+    except Exception as e:
+        logger.exception(f"/happy_hours_business error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 @app.route('/business_registration', methods=['POST', 'OPTIONS'])
 def business_registration_route():
@@ -406,6 +438,22 @@ def delete_business():
         }), 404
 
 
+# ---- UNPREFIXED ALIASES (for Nginx trailing-slash proxy_pass) ----
+# These allow requests rewritten from /happy-hours-api/... to /... to still match.
+
+@app.route('/get_business', methods=['POST', 'OPTIONS'])
+def get_business_json_unprefixed():
+    return get_business_json()
+
+@app.route('/update_business', methods=['POST', 'OPTIONS'])
+def update_business_unprefixed():
+    return update_business()
+
+@app.route('/delete_business', methods=['POST', 'OPTIONS'])
+def delete_business_unprefixed():
+    return delete_business()
+
+
 # Debug route to list all available routes (optional, remove in production)
 @app.route("/__routes__", methods=["GET"])
 def list_routes():
@@ -414,9 +462,9 @@ def list_routes():
     for rule in app.url_map.iter_rules():
         methods = ",".join(sorted(rule.methods))
         output.append({
-            "rule": str(rule),
-            "methods": methods,
-            "endpoint": rule.endpoint
+                "rule": str(rule),
+                "methods": methods,
+                "endpoint": rule.endpoint
         })
     return jsonify(output)
 
