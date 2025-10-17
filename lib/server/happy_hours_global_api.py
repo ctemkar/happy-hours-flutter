@@ -11,6 +11,7 @@ from urllib.parse import urlparse, quote
 from werkzeug.utils import secure_filename
 import os
 import logging
+import shutil
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -36,6 +37,7 @@ BASE_URL = "https://app.lovehappyhours.com/business_images/"  # keep trailing sl
 # Directory to store edited HTML files
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 STORE_DIR = os.path.join(BASE_DIR, 'output_html_store')
+OUTPUT_DIR = "/var/www/app.lovehappyhours.com/alpha/output_html"
 os.makedirs(STORE_DIR, exist_ok=True)
 
 
@@ -287,13 +289,20 @@ def update_business():
         }), 400
 
     filename = secure_filename(f"{business_name}.html")
-    out_path = os.path.join(STORE_DIR, filename)
+    #out_path = os.path.join(STORE_DIR, filename)
+    store_path = os.path.join(STORE_DIR, filename)
+    output_path = os.path.join(OUTPUT_DIR, filename)  # absolute path under /var/www/...
     
     try:
-        with open(out_path, 'w', encoding='utf-8') as f:
+        # 1) Save the canonical copy under /srv/happy-hours-api/output_html_store
+        with open(store_path, 'w', encoding='utf-8') as f:
             f.write(content_html)
+
+        # 2) Copy to the folder the user listing serves from
+        # Use copy2 to preserve timestamps (optional)
+        shutil.copy2(store_path, output_path)    
         
-        logger.info(f"✅ Saved business page: {filename}")
+        logger.info(f"✅ Saved business page and deployed to webroot: {filename}")
         return jsonify({
             "success": True, 
             "message": "Updated successfully", 
@@ -301,7 +310,7 @@ def update_business():
         }), 200
     
     except Exception as e:
-        logger.exception(f"Failed to save business page: {e}")
+        logger.exception(f"Failed to save/deploy business page: {e}")
         return jsonify({
             "success": False, 
             "message": str(e)
