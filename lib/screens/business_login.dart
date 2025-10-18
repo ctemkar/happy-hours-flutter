@@ -8,6 +8,12 @@ import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 import 'business_registration.dart';
 
+/// Normalize business name for filename lookup
+/// "Yummy Fast Food" → "Yummy-Fast-Food"
+String normalizeBusinessName(String name) {
+  return name.trim().replaceAll(RegExp(r'\s+'), '-');
+}
+
 class BusinessLoginPage extends StatefulWidget {
   const BusinessLoginPage({super.key});
 
@@ -248,8 +254,9 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
       debugPrint('⚠️ Server fetch failed: $e, falling back to asset');
     }
 
-    // 2. Fallback to local asset
-    final path = 'output_html/${widget.businessName}.html';
+    // 2. Fallback to local asset with normalized filename
+    final normalizedName = normalizeBusinessName(widget.businessName);
+    final path = 'output_html/$normalizedName.html';
     try {
       final html = await rootBundle.loadString(path);
       debugPrint('✅ Loaded HTML from asset: $path');
@@ -281,7 +288,6 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
           onSaved: (newHtml) {
             // 1) Instant optimistic UI update with the HTML we just saved
             setState(() {
-              //_htmlFuture = _loadHtml(); // Reload from server after save
               _htmlFuture = Future.value(newHtml);
             });
             // 2) Background truth refresh from server to ensure consistency
@@ -394,7 +400,6 @@ class BusinessStructuredEditPage extends StatefulWidget {
   final String businessName;
   final String? businessEmail;
   final String initialHtml;
-  //final VoidCallback onSaved;
   final void Function(String newHtml) onSaved;
 
   const BusinessStructuredEditPage({
@@ -402,7 +407,7 @@ class BusinessStructuredEditPage extends StatefulWidget {
     required this.businessName,
     this.businessEmail,
     required this.initialHtml,
-    required this.onSaved, // now expects (String newHtml)
+    required this.onSaved,
   });
 
   @override
@@ -812,14 +817,6 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
       final body = (resp.body.isNotEmpty) ? jsonDecode(resp.body) : null;
       final msg = (body is Map && body["message"] is String) ? body["message"] as String : null;
 
-      /*if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg ?? "✅ Saved successfully")),
-        );
-        widget.onSaved(); // This triggers reload from server
-        Navigator.pop(context);
-      } */
       if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
           if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
