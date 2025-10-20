@@ -269,6 +269,7 @@ def business_login_unprefixed():
 
 
 # ---- Business Page Update & Fetch Routes ----
+'''
 @app.route('/happy-hours-api/update_business', methods=['POST', 'OPTIONS'])
 def update_business():
     """
@@ -315,7 +316,80 @@ def update_business():
             "success": False, 
             "message": str(e)
         }), 500
+'''
 
+@app.route('/happy-hours-api/update_business', methods=['POST', 'OPTIONS'])
+def update_business():
+    """
+    Save edited business HTML page to disk.
+    Adds missing responsive/mobile-friendly styles to maintain consistent look.
+    Expects JSON: { business_name: str, content_html: str, email?: str }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json(silent=True) or {}
+    business_name = (data.get('business_name') or '').strip()
+    content_html = data.get('content_html')
+
+    if not business_name or not content_html:
+        return jsonify({
+            "success": False,
+            "message": "business_name and content_html are required"
+        }), 400
+
+    # ✅ Identify and inject responsive CSS if missing
+    css_snippet = """
+    html{scroll-behavior:smooth;scroll-padding-top:80px}
+    @media (max-width:900px){
+      .nav{flex-direction:column;align-items:center;gap:6px;padding:10px 0}
+      .brand{font-size:16px;white-space:nowrap}
+      .nav-links{font-size:13px;white-space:nowrap}
+      .nav-links a{margin:0 4px}
+      .hero-card{grid-template-columns:1fr}
+      .grid{grid-template-columns:1fr}
+      body{padding-top:85px}
+      html{scroll-padding-top:95px}
+    }
+    """
+
+    # Check if <style> section already has responsive code, otherwise inject it
+    import re
+    if "scroll-behavior:smooth" not in content_html or "@media (max-width:900px)" not in content_html:
+        # Try to insert just before </style>
+        content_html = re.sub(
+            r"</style>",
+            css_snippet + "\n</style>",
+            content_html,
+            flags=re.IGNORECASE
+        )
+
+    # Prepare file paths
+    filename = secure_filename(f"{business_name}.html")
+    store_path = os.path.join(STORE_DIR, filename)
+    output_path = os.path.join(OUTPUT_DIR, filename)
+
+    try:
+        # 1) Save canonical copy
+        with open(store_path, 'w', encoding='utf-8') as f:
+            f.write(content_html)
+
+        # 2) Copy it to web serving directory
+        shutil.copy2(store_path, output_path)
+
+        logger.info(f"✅ Saved business page with responsive styles: {filename}")
+        return jsonify({
+            "success": True,
+            "message": "Updated successfully (responsive styles ensured)",
+            "file": filename
+        }), 200
+
+    except Exception as e:
+        logger.exception(f"Failed to save/deploy business page: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @app.route('/happy-hours-api/page', methods=['GET', 'OPTIONS'])
 def get_business_page():

@@ -5,14 +5,18 @@ import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:happy_hours_app/screens/landing_page.dart';
+// Add these imports for iframe on web (safe on mobile due to tree-shaking)
+import 'dart:ui' as ui; // For HtmlElementView on web
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+// Guarded import so it only exists on web
+// ignore: avoid_web_libraries_in_flutter, uri_does_not_exist
+import 'dart:ui_web' as ui_web;
 
 import 'business_registration.dart';
-
-/// Normalize business name for filename lookup
-/// "Yummy Fast Food" → "Yummy-Fast-Food"
-String normalizeBusinessName(String name) {
-  return name.trim().replaceAll(RegExp(r'\s+'), '-');
-}
 
 class BusinessLoginPage extends StatefulWidget {
   const BusinessLoginPage({super.key});
@@ -27,6 +31,15 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  // Convert business name to filename format: "Yummy Fast Food" -> "Yummy_Fast_Food"
+  String _convertBusinessNameToFileName(String businessName) {
+    return businessName
+        .trim()
+        .split(RegExp(r'\s+')) // Split by one or more spaces
+        .where((word) => word.isNotEmpty) // Remove empty strings
+        .join('_'); // Join with underscore
+  }
 
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
@@ -62,12 +75,18 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
             return;
           }
 
+          // Convert business name to filename format
+          final fileName = _convertBusinessNameToFileName(businessName);
+          debugPrint('Original business name: $businessName');
+          debugPrint('Converted filename: $fileName');
+
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => BusinessPageByExactName(
                 businessName: businessName,
+                fileName: fileName, // Pass the converted filename
                 businessEmail: _emailController.text.trim(),
               ),
             ),
@@ -119,6 +138,17 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LandingPage(), // replace with your main landing widget
+              ),
+      );
+    },
+  ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -210,11 +240,13 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
 // ================== Business Page (by exact name) ==================
 class BusinessPageByExactName extends StatefulWidget {
   final String businessName;
+  final String fileName; // The converted filename (e.g., "Yummy_Fast_Food")
   final String? businessEmail;
 
   const BusinessPageByExactName({
     super.key,
     required this.businessName,
+    required this.fileName,
     this.businessEmail,
   });
 
@@ -231,7 +263,7 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
     _htmlFuture = _loadHtml();
   }
 
-  // Try server first, fallback to local asset
+  // Try server first, fallback to local asset using the converted filename
   Future<String> _loadHtml() async {
     // 1. Try fetching from server
     try {
@@ -254,13 +286,12 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
       debugPrint('⚠️ Server fetch failed: $e, falling back to asset');
     }
 
-    // 2. Fallback to local asset with normalized filename
-    final normalizedName = normalizeBusinessName(widget.businessName);
-    final path = 'output_html/$normalizedName.html';
+    // 2. Fallback to local asset using the converted filename
+    final path = 'output_html/${widget.fileName}.html';
     try {
-      final html = await rootBundle.loadString(path);
+      final htmlStr = await rootBundle.loadString(path);
       debugPrint('✅ Loaded HTML from asset: $path');
-      return html;
+      return htmlStr;
     } catch (e) {
       debugPrint('❌ Asset load failed: $path, error: $e');
       return """
@@ -268,6 +299,8 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
           <body style="font-family:sans-serif; padding:16px;">
             <h2 style='color:red; text-align:center;'>No page found for "${widget.businessName}".</h2>
             <p style='text-align:center;'>Tried server and asset: $path</p>
+            <p style='text-align:center;'>Business Name: ${widget.businessName}</p>
+            <p style='text-align:center;'>File Name: ${widget.fileName}</p>
             <pre>$e</pre>
           </body>
         </html>
@@ -361,8 +394,47 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
       future: _htmlFuture,
       builder: (context, snapshot) {
         final loading = snapshot.connectionState != ConnectionState.done;
-        final html = snapshot.data ?? "";
+        final htmlDoc = snapshot.data ?? "";
 
+        // WEB: render full-screen iframe so original styles are retained
+        if (kIsWeb) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(
+                widget.businessName,
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: const Color(0xFF6a0dad),
+              iconTheme: const IconThemeData(color: Colors.white),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.push(   //Replacement
+                    context,
+                    MaterialPageRoute(builder: (_) => const BusinessLoginPage()),
+                  );
+                },
+              ),
+              actions: [
+                IconButton(
+                  tooltip: "Edit",
+                  icon: const Icon(Icons.edit),
+                  onPressed: loading ? null : _onEdit,
+                ),
+                IconButton(
+                  tooltip: "Delete",
+                  icon: const Icon(Icons.delete),
+                  onPressed: loading ? null : _onDelete,
+                ),
+              ],
+            ),
+            body: loading
+                ? const Center(child: CircularProgressIndicator())
+                : _FullScreenIframe(srcdoc: htmlDoc),
+          );
+        }
+
+        // MOBILE: unchanged (WebView)
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -371,6 +443,15 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
             ),
             backgroundColor: const Color(0xFF6a0dad),
             iconTheme: const IconThemeData(color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                Navigator.push(  //Replacement
+                  context,
+                  MaterialPageRoute(builder: (_) => const BusinessLoginPage()),
+                );
+              },
+            ),
             actions: [
               IconButton(
                 tooltip: "Edit",
@@ -386,9 +467,62 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
           ),
           body: loading
               ? const Center(child: CircularProgressIndicator())
-              : kIsWeb
-                  ? SingleChildScrollView(child: HtmlWidget(html))
-                  : _MobileWebView(html: html),
+              : _MobileWebView(html: htmlDoc),
+        );
+      },
+    );
+  }
+}
+
+// =============== Full-screen iframe for Flutter Web ===============
+class _FullScreenIframe extends StatefulWidget {
+  final String? url;    // Optional if you host the page
+  final String? srcdoc; // Raw HTML to render (preferred here)
+  const _FullScreenIframe({this.url, this.srcdoc})
+      : assert((url != null) ^ (srcdoc != null), 'Provide either url or srcdoc');
+
+  @override
+  State<_FullScreenIframe> createState() => _FullScreenIframeState();
+}
+
+class _FullScreenIframeState extends State<_FullScreenIframe> {
+  late final String _viewType;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewType = 'bhh-iframe-${DateTime.now().microsecondsSinceEpoch}';
+
+    // ignore: undefined_prefixed_name
+    //ui.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+      final iframe = html.IFrameElement()
+        ..style.border = '0'
+        ..style.margin = '0'
+        ..style.padding = '0'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.display = 'block'
+        ..setAttribute('allow', 'clipboard-read; clipboard-write; geolocation *; fullscreen *')
+        ..setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation');
+
+      if (widget.url != null) {
+        iframe.src = widget.url!;
+      } else {
+        iframe.srcdoc = widget.srcdoc!;
+      }
+      return iframe;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: HtmlElementView(viewType: _viewType),
         );
       },
     );
@@ -515,7 +649,7 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
       // About block: <section id="about"> ... <div>About text</div>
       aboutCtrl.text = _stripTags(_firstMatch(html, RegExp(r'<section[^>]*id="about"[^>]*>.*?<div[^>]*class="card"[^>]*>.*?<h3>About<\/h3>\s*<div[^>]*>(.*?)<\/div>', caseSensitive: false, dotAll: true)) ?? '');
 
-      // Opening Hours list: collect each li day + time into lines "Monday 9:00 – 23:30"
+      // Opening Hours list
       final hoursBlock = _firstMatch(html, RegExp(r'<aside[^>]*id="hours"[^>]*>.*?<ul[^>]*class="[^"]*hours-list[^"]*"[^>]*>(.*?)</ul>', caseSensitive: false, dotAll: true)) ?? '';
       final hoursRows = RegExp(r'<li[^>]*class="[^"]*hours-row[^"]*"[^>]*>.*?<span[^>]*class="[^"]*day[^"]*"[^>]*>(.*?)</span>.*?<span[^>]*class="[^"]*time[^"]*"[^>]*>(.*?)</span>.*?</li>',
           caseSensitive: false, dotAll: true).allMatches(hoursBlock);
@@ -527,11 +661,9 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
       }
       openingHoursCtrl.text = openingLines.join('\n');
 
-      // Happy Hour section: one muted line + one list row with time
+      // Happy Hour section
       final happyBlock = _firstMatch(html, RegExp(r'<section[^>]*id="happy"[^>]*>.*?<article[^>]*class="card"[^>]*>.*?<h3>Happy Hour</h3>(.*?)</article>', caseSensitive: false, dotAll: true)) ?? '';
-      // muted line
       final muted = _stripTags(_firstMatch(happyBlock, RegExp(r'<p[^>]*class="[^"]*muted[^"]*"[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true)) ?? '');
-      // time line inside <li class="hours-row"><span>Daily</span><span class="time">15:00..</span>
       String dailyTime = '';
       final happyRow = RegExp(r'<li[^>]*class="[^"]*hours-row[^"]*"[^>]*>.*?<span[^>]*>(.*?)</span>.*?<span[^>]*class="[^"]*time[^"]*"[^>]*>(.*?)</span>.*?</li>',
           caseSensitive: false, dotAll: true).firstMatch(happyBlock);
@@ -542,18 +674,17 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
       }
       happyHoursCtrl.text = [muted, dailyTime].where((e) => e.trim().isNotEmpty).join('\n');
 
-      // Current Offers section: list items; combine into lines
+      // Current Offers section
       final offersBlock = _firstMatch(html, RegExp(r'<aside[^>]*id="offers"[^>]*>.*?<ul[^>]*class="[^"]*list[^"]*"[^>]*>(.*?)</ul>', caseSensitive: false, dotAll: true)) ?? '';
       final offerLis = RegExp(r'<li[^>]*>(.*?)</li>', caseSensitive: false, dotAll: true).allMatches(offersBlock).map((m) => _stripTags(m.group(1) ?? '')).toList();
       currentOffersCtrl.text = offerLis.join('\n');
 
-      // Location address: <section id="map"> ... <p>ADDRESS</p>
+      // Location address
       locationAddressCtrl.text = _stripTags(_firstMatch(html, RegExp(r'<section[^>]*id="map"[^>]*>.*?<div[^>]*class="card"[^>]*>.*?<h3>Location<\/h3>\s*<p[^>]*>(.*?)<\/p>', caseSensitive: false, dotAll: true)) ?? '');
 
-      // Contact: phone (tel link), address text
+      // Contact
       contactPhoneCtrl.text = _stripTags(_firstMatch(html, RegExp(r'<aside[^>]*id="contact"[^>]*>.*?Phone:\s*<\/div>\s*<div[^>]*>.*?>(\+?[0-9()\-\s]+)<\/a>', caseSensitive: false, dotAll: true)) ?? '');
       contactAddressCtrl.text = _stripTags(_firstMatch(html, RegExp(r'<aside[^>]*id="contact"[^>]*>.*?Address:\s*<\/div>\s*<div[^>]*>(.*?)<\/div>', caseSensitive: false, dotAll: true)) ?? '');
-      // No email in your HTML; keep empty
       contactEmailCtrl.text = '';
 
       // Good to Know items
@@ -818,13 +949,13 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
       final msg = (body is Map && body["message"] is String) ? body["message"] as String : null;
 
       if (resp.statusCode == 200 && (body is Map && body["success"] == true)) {
-          if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(msg ?? "Saved successfully")),
-            );
-            // Pass the just-saved HTML up so parent can show it instantly
-            widget.onSaved(newHtml);
-            Navigator.pop(context);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg ?? "Saved successfully")),
+        );
+        // Pass the just-saved HTML up so parent can show it instantly
+        widget.onSaved(newHtml);
+        Navigator.pop(context);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -960,7 +1091,7 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
   }
 }
 
-class _MobileWebView extends StatelessWidget {
+/*class _MobileWebView extends StatelessWidget {
   final String html;
   const _MobileWebView({required this.html});
 
@@ -970,5 +1101,47 @@ class _MobileWebView extends StatelessWidget {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadHtmlString(html);
     return WebViewWidget(controller: controller);
+  }
+}*/
+
+/// Fixed version of the mobile WebView so internal anchor links (#about, #hours, etc.)
+/// scroll inside the same page instead of reloading or navigating away.
+class _MobileWebView extends StatefulWidget {
+  final String html;
+  const _MobileWebView({required this.html});
+
+  @override
+  State<_MobileWebView> createState() => _MobileWebViewState();
+}
+
+class _MobileWebViewState extends State<_MobileWebView> {
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (request) {
+            // ✅ Prevent full navigation when clicking in‑page anchors
+            if (request.url.contains('#')) {
+              final id = request.url.split('#').last;
+              _controller.runJavaScript('location.hash = "$id";');
+              return NavigationDecision.prevent;
+            }
+            // For normal links (like external URLs) allow navigation
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadHtmlString(widget.html);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WebViewWidget(controller: _controller);
   }
 }
