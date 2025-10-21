@@ -493,8 +493,6 @@ class _FullScreenIframeState extends State<_FullScreenIframe> {
     super.initState();
     _viewType = 'bhh-iframe-${DateTime.now().microsecondsSinceEpoch}';
 
-    // ignore: undefined_prefixed_name
-    //ui.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
       final iframe = html.IFrameElement()
         ..style.border = '0'
@@ -504,15 +502,45 @@ class _FullScreenIframeState extends State<_FullScreenIframe> {
         ..style.height = '100%'
         ..style.display = 'block'
         ..setAttribute('allow', 'clipboard-read; clipboard-write; geolocation *; fullscreen *')
-        ..setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation');
+        // ✅ FIX: Allow navigation within the same origin
+        ..setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation');
 
       if (widget.url != null) {
         iframe.src = widget.url!;
       } else {
-        iframe.srcdoc = widget.srcdoc!;
+        // ✅ Inject the HTML with a script to handle anchor navigation
+        final enhancedHtml = _injectAnchorScrollScript(widget.srcdoc!);
+        iframe.srcdoc = enhancedHtml;
       }
+      
       return iframe;
     });
+  }
+
+  // ✅ Helper method to inject smooth scroll behavior for anchor links
+  String _injectAnchorScrollScript(String html) {
+    const script = '''
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Handle all anchor link clicks
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+          anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              // Update URL hash without triggering navigation
+              history.replaceState(null, null, '#' + targetId);
+            }
+          });
+        });
+      });
+    </script>
+    ''';
+    
+    // Insert script before closing </body> tag
+    return html.replaceFirst('</body>', '$script</body>');
   }
 
   @override
@@ -1090,19 +1118,6 @@ class _BusinessStructuredEditPageState extends State<BusinessStructuredEditPage>
     );
   }
 }
-
-/*class _MobileWebView extends StatelessWidget {
-  final String html;
-  const _MobileWebView({required this.html});
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadHtmlString(html);
-    return WebViewWidget(controller: controller);
-  }
-}*/
 
 /// Fixed version of the mobile WebView so internal anchor links (#about, #hours, etc.)
 /// scroll inside the same page instead of reloading or navigating away.
