@@ -26,6 +26,9 @@ SMTP_PORT = 25
 
 VERIFY_LINK_BASE = "https://customercallsapp.com/prod/customercallsapp/verified.php"
 
+# Path where static HTML pages will be saved
+STATIC_PAGES_DIR = "app.lovehappyhours.com/alpha/output_html"
+
 # ================== Logger ==================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("business_registration")
@@ -91,6 +94,218 @@ def sendSMS_TextBee(toPhone: str, textMessage: str) -> bool:
     except Exception as e:
         logMessage(f"❌ SMS send exception: {str(e)}")
         return False
+
+# ================== Static Page Generator ==================
+def generate_static_page(business_data):
+    """
+    Generate a static HTML page for the business using the provided data
+    """
+    try:
+        # Extract data with safe defaults
+        business_name = as_text(business_data.get('businessName', ''), 'Business')
+        description = as_text(business_data.get('description', ''), '')
+        city = as_text(business_data.get('city', ''), '')
+        address = as_text(business_data.get('address', ''), '')
+        state = as_text(business_data.get('state', ''), '')
+        country = as_text(business_data.get('country', ''), '')
+        category = as_text(business_data.get('category', ''), '')
+        open_hours = as_text(business_data.get('open_hours', ''), '')
+        happy_hour_start = as_text(business_data.get('happy_hour_start', ''), '')
+        happy_hour_end = as_text(business_data.get('happy_hour_end', ''), '')
+        phone = as_text(business_data.get('phone', ''), '')
+        remark = as_text(business_data.get('remark', ''), '')
+        latitude = as_text(business_data.get('latitude', ''), '')
+        longitude = as_text(business_data.get('longitude', ''), '')
+        happy_hours_id = as_text(business_data.get('happy_hours_id', ''), '')
+        
+        # Build location string for chips
+        location_parts = [city, state] if state else [city]
+        location_str = ' • '.join(filter(None, location_parts))
+        
+        # Build full address
+        full_address_parts = [address, city, state, country]
+        full_address = ', '.join(filter(None, full_address_parts))
+        
+        # Build map query string
+        map_query = full_address if full_address else f"{latitude},{longitude}" if latitude and longitude else ""
+        
+        # Generate HTML content
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{business_name} | {city}</title>
+  <meta name="description" content="{business_name} in {city} — hours, happy hours, offers, photos, map, and contact details." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{{--card:#f9fafb;--muted:#6b7280;--brand-2:#12a56a;--shadow:0 2px 8px rgba(0,0,0,0.08);--radius:12px}}
+    *{{box-sizing:border-box}}
+    html,body{{height:100%}}
+    body{{margin:0;font-family:Inter,system-ui,Arial;color:#1f2937;background:#fff;line-height:1.6;padding-top:68px}}
+    a{{color:#2563eb;text-decoration:none}}
+    .container{{width:min(1120px,92vw);margin:0 auto;padding:0 12px}}
+    header{{position:fixed;top:0;left:0;right:0;z-index:999;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 4px rgba(0,0,0,0.04)}}
+    .nav{{display:flex;align-items:center;justify-content:space-between;padding:12px 0}}
+    .brand{{font-weight:800}}
+    .nav-links a{{color:var(--muted);margin:0 6px}}
+    .nav-links a:hover{{text-decoration:underline}}
+    .hero{{padding:48px 0}}
+    .hero-card{{background:var(--card);border-radius:20px;padding:22px;display:grid;grid-template-columns:1.6fr 1fr;gap:18px;box-shadow:var(--shadow)}}
+    .title{{font-size:clamp(28px,4vw,40px);margin:6px 0}}
+    .sub{{color:var(--muted)}}
+    .chip{{background:#eef2ff;border-radius:10px;padding:8px 10px;color:#4338ca;font-size:12px;margin-right:8px;display:inline-block}}
+    .hero-img{{width:100%;height:100%;object-fit:cover;border-radius:12px}}
+    .hero-placeholder{{width:100%;height:300px;background:#e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--muted)}}
+    .card{{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:14px}}
+    .grid{{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}}
+    .list{{list-style:none;padding:0;margin:10px 0 0}}
+    .muted{{color:var(--muted)}}
+    .badge{{font-size:12px;padding:6px 8px;border-radius:8px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0}}
+    .hours-list{{list-style:none;padding:0;margin:10px 0 0}}
+    .hours-row{{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px dashed #e5e7eb}}
+    .hours-row:last-child{{border-bottom:none}}
+    .day{{font-weight:500}}
+    .time{{margin-left:auto;text-align:right;color:#1f2937}}
+    .gtk-list{{list-style:none;padding:0;margin:10px 0 0}}
+    .gtk-item{{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px dashed #e5e7eb}}
+    .gtk-item:last-child{{border-bottom:none}}
+    .gtk-label{{font-weight:600;white-space:nowrap;color:#1f2937}}
+    .gtk-value{{color:#1f2937}}
+    .map{{width:100%;height:280px;border:0;border-radius:12px}}
+    footer{{color:var(--muted);padding:18px 0}}
+    @media (max-width:900px){{
+      .hero-card{{grid-template-columns:1fr}}
+      .grid{{grid-template-columns:1fr}}
+      body{{padding-top:76px}}
+    }}
+  
+    html{{scroll-behavior:smooth;scroll-padding-top:80px}}
+    @media (max-width:900px){{
+      .nav{{flex-direction:column;align-items:center;gap:6px;padding:10px 0}}
+      .brand{{font-size:16px;white-space:nowrap}}
+      .nav-links{{font-size:13px;white-space:nowrap}}
+      .nav-links a{{margin:0 4px}}
+      .hero-card{{grid-template-columns:1fr}}
+      .grid{{grid-template-columns:1fr}}
+      body{{padding-top:85px}}
+      html{{scroll-padding-top:95px}}
+    }}
+    
+</style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <div class="brand">{city} Happy Hours</div>
+      <nav class="nav-links">
+        <a href="#about">About</a> •
+        <a href="#hours">Hours</a> •
+        <a href="#happy">Happy Hour</a> •
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-card">
+        <div>
+          <h1 class="title">{business_name}</h1>
+          <p class="sub">{description if description else 'Welcome to our establishment'}</p>
+          <div style="margin-top:12px">
+            {f'<span class="chip">{location_str}</span>' if location_str else ''}
+            {f'<span class="chip">Category: {category}</span>' if category else ''}
+            {f'<span class="chip">Open: {open_hours}</span>' if open_hours else ''}
+            {f'<span class="chip">Happy Hour: {happy_hour_start}–{happy_hour_end}</span>' if happy_hour_start and happy_hour_end else ''}
+          </div>
+        </div>
+        <div class="hero-media">
+          <div class="hero-placeholder">Image Coming Soon</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="container grid">
+      <article class="card">
+        <h3>About</h3>
+        <div>{description if description else 'Information coming soon.'}</div>
+      </article>
+
+      <aside id="hours" class="card">
+        <h3>Opening Hours</h3>
+        {f'<p>{open_hours}</p>' if open_hours else '<p class="muted">Hours information coming soon.</p>'}
+        <p class="meta muted">Note: Hours may vary on holidays and during special events.</p>
+      </aside>
+    </section>
+
+    {f'''<section id="happy" class="container grid">
+      <article class="card">
+        <h3>Happy Hour</h3>
+        <ul class="list"><li class="hours-row"><span>Daily</span><span class="time" style="color:var(--brand-2);font-weight:700">{happy_hour_start} – {happy_hour_end}</span></li></ul>
+      </article>
+
+      <aside class="card">
+        <h3>Special Notes</h3>
+        <p>{remark if remark else 'Enjoy our happy hour specials!'}</p>
+      </aside>
+    </section>''' if happy_hour_start and happy_hour_end else ''}
+
+    {f'''<section id="map" class="container" style="margin-top:14px">
+      <div class="card">
+        <h3>Location</h3>
+        <p>{full_address}</p>
+        <iframe class="map" loading="lazy" src="https://www.google.com/maps?q={map_query}&output=embed" allowfullscreen></iframe>
+      </div>
+    </section>''' if map_query else ''}
+
+    <section id="contact" class="container" style="margin-top:14px">
+      <div class="card">
+        <h3>Contact</h3>
+        {f'''<div style="margin-bottom:8px">
+          <div class="muted">Phone: </div>
+          <div><a href="tel:{phone}">{phone}</a></div>
+        </div>''' if phone else ''}
+        
+        {f'''<div class="muted" style="margin-top:8px">Address: </div>
+        <div>{full_address}</div>''' if full_address else ''}
+      </div>
+    </section>
+
+    {f'''<section class="container" style="margin-top:14px">
+      <div class="card">
+        <h3>Additional Information</h3>
+        <ul class="gtk-list">
+          <li class="gtk-item"><span class="gtk-label">Category: </span><span class="gtk-value">{category}</span></li>
+          {f'<li class="gtk-item"><span class="gtk-label">Remarks: </span><span class="gtk-value">{remark}</span></li>' if remark else ''}
+        </ul>
+      </div>
+    </section>''' if category or remark else ''}
+  </main>
+
+  <footer class="container">
+    <div>© 2025 {city} Happy Hours • This is a static informational page.</div>
+  </footer>
+</body>
+</html>"""
+
+        # Create directory if it doesn't exist
+        os.makedirs(STATIC_PAGES_DIR, exist_ok=True)
+        
+        # Generate filename using business ID
+        filename = f"{business_name}.html"
+        filepath = os.path.join(STATIC_PAGES_DIR, filename)
+        
+        # Write HTML file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        logMessage(f"✅ Static page created: {filepath}")
+        return filepath, filename
+        
+    except Exception as e:
+        logMessage(f"❌ Static page generation failed: {str(e)}")
+        return None, None
 
 # ================== Main Route Function ==================
 def business_registration():
@@ -193,6 +408,27 @@ def business_registration():
             conn.commit()
 
         logMessage(f"Insert successful for email: {email} (id={happy_hours_id})")
+
+        # Generate static business page
+        business_data = {
+            'happy_hours_id': happy_hours_id,
+            'businessName': businessName,
+            'description': description,
+            'city': city,
+            'state': state,
+            'country': country,
+            'address': address,
+            'category': category,
+            'open_hours': openHours,
+            'happy_hour_start': happyHourStart,
+            'happy_hour_end': happyHourEnd,
+            'phone': phone,
+            'remark': remark,
+            'latitude': latitude,
+            'longitude': longitude
+        }
+        
+        filepath, filename = generate_static_page(business_data)
 
         # Send verification email (best-effort)
         try:
