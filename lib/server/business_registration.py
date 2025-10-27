@@ -27,7 +27,7 @@ SMTP_PORT = 25
 VERIFY_LINK_BASE = "https://customercallsapp.com/prod/customercallsapp/verified.php"
 
 # Path where static HTML pages will be saved
-STATIC_PAGES_DIR = "app.lovehappyhours.com/alpha/output_html"
+STATIC_PAGES_DIR = "/var/www/app.lovehappyhours.com/alpha/output_html"
 
 # ================== Logger ==================
 logging.basicConfig(level=logging.INFO)

@@ -158,7 +158,7 @@ def happy_hours_api():
             pass
 
 
-# NEW: Route that replicates the “business” API endpoint (without PHP filename)
+# NEW: Route that replicates the "business" API endpoint (without PHP filename)
 @app.route('/happy_hours_business', methods=['GET', 'OPTIONS'])
 def happy_hours_business():
     """
@@ -191,9 +191,19 @@ def happy_hours_business():
         except Exception:
             pass
 
+
+# ---- Business Registration Routes (BOTH prefixed and unprefixed) ----
+@app.route('/happy-hours-api/business_registration', methods=['POST', 'OPTIONS'])
+def business_registration_route_prefixed():
+    """Business registration endpoint with /happy-hours-api/ prefix"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    return br_handler()
+
+
 @app.route('/business_registration', methods=['POST', 'OPTIONS'])
 def business_registration_route():
-    """Business registration endpoint"""
+    """Business registration endpoint without prefix"""
     if request.method == 'OPTIONS':
         return '', 200
     return br_handler()
@@ -269,55 +279,6 @@ def business_login_unprefixed():
 
 
 # ---- Business Page Update & Fetch Routes ----
-'''
-@app.route('/happy-hours-api/update_business', methods=['POST', 'OPTIONS'])
-def update_business():
-    """
-    Save edited business HTML page to disk.
-    Expects JSON: { business_name: str, content_html: str, email?: str }
-    """
-    if request.method == 'OPTIONS':
-        return '', 204
-    
-    data = request.get_json(silent=True) or {}
-    business_name = (data.get('business_name') or '').strip()
-    content_html = data.get('content_html')
-    
-    if not business_name or not content_html:
-        return jsonify({
-            "success": False, 
-            "message": "business_name and content_html are required"
-        }), 400
-
-    filename = secure_filename(f"{business_name}.html")
-    #out_path = os.path.join(STORE_DIR, filename)
-    store_path = os.path.join(STORE_DIR, filename)
-    output_path = os.path.join(OUTPUT_DIR, filename)  # absolute path under /var/www/...
-    
-    try:
-        # 1) Save the canonical copy under /srv/happy-hours-api/output_html_store
-        with open(store_path, 'w', encoding='utf-8') as f:
-            f.write(content_html)
-
-        # 2) Copy to the folder the user listing serves from
-        # Use copy2 to preserve timestamps (optional)
-        shutil.copy2(store_path, output_path)    
-        
-        logger.info(f"✅ Saved business page and deployed to webroot: {filename}")
-        return jsonify({
-            "success": True, 
-            "message": "Updated successfully", 
-            "file": filename
-        }), 200
-    
-    except Exception as e:
-        logger.exception(f"Failed to save/deploy business page: {e}")
-        return jsonify({
-            "success": False, 
-            "message": str(e)
-        }), 500
-'''
-
 @app.route('/happy-hours-api/update_business', methods=['POST', 'OPTIONS'])
 def update_business():
     """
@@ -391,6 +352,7 @@ def update_business():
             "message": str(e)
         }), 500
 
+
 @app.route('/happy-hours-api/page', methods=['GET', 'OPTIONS'])
 def get_business_page():
     """
@@ -428,6 +390,7 @@ def get_business_page():
             "success": False, 
             "message": "Page not found"
         }), 404
+
 
 @app.route('/happy-hours-api/get_business', methods=['POST', 'OPTIONS'])
 def get_business_json():
