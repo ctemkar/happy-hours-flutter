@@ -10,8 +10,6 @@ import 'package:happy_hours_app/screens/landing_page.dart';
 import 'dart:ui' as ui; // For HtmlElementView on web
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 // Guarded import so it only exists on web
 // ignore: avoid_web_libraries_in_flutter, uri_does_not_exist
 import 'dart:ui_web' as ui_web;
@@ -146,9 +144,9 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
               MaterialPageRoute(
                 builder: (_) => const LandingPage(), // replace with your main landing widget
               ),
-      );
-    },
-  ),
+            );
+          },
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -264,7 +262,7 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
   }
 
   // Try server first, fallback to local asset using the converted filename
-  Future<String> _loadHtml() async {
+ /* Future<String> _loadHtml() async {
     // 1. Try fetching from server
     try {
       final response = await http.post(
@@ -276,10 +274,22 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
       debugPrint('Server fetch response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data["success"] == true && data["content_html"] != null) {
+        // ✅ Check if response is HTML (starts with <!DOCTYPE or <html)
+        final body = response.body.trim();
+        if (body.startsWith('<!DOCTYPE') || body.startsWith('<html')) {
           debugPrint('✅ Loaded HTML from server for ${widget.businessName}');
-          return data["content_html"] as String;
+          return body;
+        }
+        
+        // If it's JSON (old format), parse it
+        try {
+          final data = jsonDecode(body);
+          if (data["success"] == true && data["content_html"] != null) {
+            debugPrint('✅ Loaded HTML from server (JSON format) for ${widget.businessName}');
+            return data["content_html"] as String;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Response is neither HTML nor valid JSON: $e');
         }
       }
     } catch (e) {
@@ -306,7 +316,68 @@ class _BusinessPageByExactNameState extends State<BusinessPageByExactName> {
         </html>
       """;
     }
+  } */
+
+  // Try server first, fallback to local asset using the converted filename
+Future<String> _loadHtml() async {
+  // 1. Try fetching from server
+  try {
+    final response = await http.post(
+      Uri.parse("https://app.lovehappyhours.com/happy-hours-api/get_business"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"business_name": widget.businessName}),
+    );
+
+    debugPrint('Server fetch response: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      // ✅ CRITICAL FIX: Check if response is HTML FIRST (before trying to parse as JSON)
+      final body = response.body.trim();
+      
+      // Check if it starts with HTML tags
+      if (body.startsWith('<!DOCTYPE') || 
+          body.startsWith('<html') || 
+          body.startsWith('<HTML')) {
+        debugPrint('✅ Loaded HTML from server for ${widget.businessName}');
+        return body;
+      }
+      
+      // Only if it's NOT HTML, try parsing as JSON
+      try {
+        final data = jsonDecode(body);
+        if (data["success"] == true && data["content_html"] != null) {
+          debugPrint('✅ Loaded HTML from server (JSON format) for ${widget.businessName}');
+          return data["content_html"] as String;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Response is neither HTML nor valid JSON: $e');
+      }
+    }
+  } catch (e) {
+    debugPrint('⚠️ Server fetch failed: $e, falling back to asset');
   }
+
+  // 2. Fallback to local asset using the converted filename
+  final path = 'output_html/${widget.fileName}.html';
+  try {
+    final htmlStr = await rootBundle.loadString(path);
+    debugPrint('✅ Loaded HTML from asset: $path');
+    return htmlStr;
+  } catch (e) {
+    debugPrint('❌ Asset load failed: $path, error: $e');
+    return """
+      <html>
+        <body style="font-family:sans-serif; padding:16px;">
+          <h2 style='color:red; text-align:center;'>No page found for "${widget.businessName}".</h2>
+          <p style='text-align:center;'>Tried server and asset: $path</p>
+          <p style='text-align:center;'>Business Name: ${widget.businessName}</p>
+          <p style='text-align:center;'>File Name: ${widget.fileName}</p>
+          <pre>$e</pre>
+        </body>
+      </html>
+    """;
+  }
+}
 
   void _onEdit() async {
     final html = await _htmlFuture;

@@ -39,6 +39,11 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 STORE_DIR = os.path.join(BASE_DIR, 'output_html_store')
 OUTPUT_DIR = "/var/www/app.lovehappyhours.com/alpha/output_html"
 os.makedirs(STORE_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Log directory paths at startup
+logger.info(f"📁 STORE_DIR: {STORE_DIR}")
+logger.info(f"📁 OUTPUT_DIR: {OUTPUT_DIR}")
 
 
 def get_db_connection():
@@ -395,9 +400,9 @@ def get_business_page():
 @app.route('/happy-hours-api/get_business', methods=['POST', 'OPTIONS'])
 def get_business_json():
     """
-    JSON endpoint to fetch saved business HTML from filesystem.
+    Fetch saved business HTML from filesystem and return it directly as HTML.
     Request JSON: { "business_name": "Exact Name" }
-    Returns JSON: { success, business_name, content_html, updated_at }
+    Returns: Raw HTML content (not JSON)
     """
     if request.method == 'OPTIONS':
         return '', 204
@@ -406,6 +411,7 @@ def get_business_json():
     business_name = (data.get('business_name') or '').strip()
 
     if not business_name:
+        logger.warning("❌ get_business called without business_name")
         return jsonify({
             "success": False,
             "message": "business_name is required"
@@ -414,7 +420,17 @@ def get_business_json():
     filename = secure_filename(f"{business_name}.html")
     saved_path = os.path.join(STORE_DIR, filename)
 
+    logger.info(f"🔍 Searching for: {saved_path}")
+
     if not os.path.exists(saved_path):
+        logger.warning(f"❌ File not found: {saved_path}")
+        # List available files for debugging
+        try:
+            available = os.listdir(STORE_DIR)
+            logger.info(f"📁 Available files in STORE_DIR: {available[:10]}")
+        except Exception as e:
+            logger.error(f"❌ Can't list STORE_DIR: {str(e)}")
+        
         return jsonify({
             "success": False,
             "message": f"Page not found for '{business_name}'"
@@ -424,22 +440,16 @@ def get_business_json():
         with open(saved_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
-        from datetime import datetime
-        updated_at = datetime.fromtimestamp(os.path.getmtime(saved_path)).isoformat()
-
-        return jsonify({
-            "success": True,
-            "business_name": business_name,
-            "content_html": html_content,
-            "updated_at": updated_at
-        }), 200
+        logger.info(f"✅ Serving HTML for: {business_name}")
+        # Return raw HTML, not JSON
+        return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
     except Exception as e:
-        logger.exception(f"Failed to read business page for JSON: {e}")
+        logger.exception(f"Failed to read business page: {e}")
         return jsonify({
             "success": False,
             "message": str(e)
-        }), 500        
+        }), 500
 
 
 @app.route('/happy-hours-api/delete_business', methods=['POST', 'OPTIONS'])
