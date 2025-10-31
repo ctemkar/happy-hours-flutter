@@ -111,12 +111,22 @@ def generate_static_page(business_data):
     """
     Generate a static HTML page for the business using the provided data.
     ✅ FIXED: Uses secure_filename and writes to BOTH directories.
+    ✅ ENHANCED: Added extensive logging for city name debugging
     """
     try:
-        # Extract data with safe defaults
+        # ✅ Extract city with detailed logging
+        city_raw = business_data.get('city', '')
+        city = as_text(city_raw, 'City')  # Default to 'City' if empty
+        
+        logMessage(f"🔍 DEBUG - City extraction:")
+        logMessage(f"   - Raw city value: '{city_raw}'")
+        logMessage(f"   - Processed city value: '{city}'")
+        logMessage(f"   - City type: {type(city)}")
+        logMessage(f"   - City length: {len(city)}")
+        
+        # Extract other data with safe defaults
         business_name = as_text(business_data.get('businessName', ''), 'Business')
         description = as_text(business_data.get('description', ''), '')
-        city = as_text(business_data.get('city', ''), '')
         address = as_text(business_data.get('address', ''), '')
         state = as_text(business_data.get('state', ''), '')
         country = as_text(business_data.get('country', ''), '')
@@ -130,6 +140,12 @@ def generate_static_page(business_data):
         longitude = as_text(business_data.get('longitude', ''), '')
         happy_hours_id = as_text(business_data.get('happy_hours_id', ''), '')
         
+        logMessage(f"🔍 DEBUG - Business data summary:")
+        logMessage(f"   - Business Name: {business_name}")
+        logMessage(f"   - City for Header: '{city} Happy Hours'")
+        logMessage(f"   - State: {state}")
+        logMessage(f"   - Category: {category}")
+        
         # Build location string for chips
         location_parts = [city, state] if state else [city]
         location_str = ' • '.join(filter(None, location_parts))
@@ -141,6 +157,10 @@ def generate_static_page(business_data):
         # Build map query string
         from urllib.parse import quote
         map_query = quote(full_address) if full_address else f"{latitude},{longitude}" if latitude and longitude else ""
+        
+        # ✅ Log the header that will be generated
+        header_text = f"{city} Happy Hours"
+        logMessage(f"🎯 HEADER TEXT WILL BE: '{header_text}'")
         
         # Generate HTML content
         html_content = f"""<!DOCTYPE html>
@@ -298,6 +318,8 @@ def generate_static_page(business_data):
         # ✅ FIXED: Use secure_filename to match API expectations
         filename = secure_filename(f"{business_name}.html")
         
+        logMessage(f"📝 Generated filename: {filename}")
+        
         # ✅ FIXED: Write to BOTH locations
         store_path = os.path.join(STORE_DIR, filename)
         output_path = os.path.join(OUTPUT_DIR, filename)
@@ -306,12 +328,28 @@ def generate_static_page(business_data):
         with open(store_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
+        logMessage(f"✅ File written to STORE_DIR: {store_path}")
+        
         # Copy to OUTPUT_DIR (where web serves from)
         shutil.copy2(store_path, output_path)
         
+        logMessage(f"✅ File copied to OUTPUT_DIR: {output_path}")
         logMessage(f"✅ Static page created in BOTH locations: {filename}")
         logMessage(f"   - STORE: {store_path}")
         logMessage(f"   - WEB: {output_path}")
+        logMessage(f"🎯 FINAL CONFIRMATION - Header contains: '{city} Happy Hours'")
+        
+        # ✅ Verify file contents by reading first 500 chars
+        try:
+            with open(output_path, 'r', encoding='utf-8') as f:
+                content_preview = f.read(1000)
+                if f"{city} Happy Hours" in content_preview:
+                    logMessage(f"✅ VERIFIED: City name '{city}' found in generated HTML header")
+                else:
+                    logMessage(f"⚠️ WARNING: City name '{city}' NOT found in generated HTML!")
+                    logMessage(f"   Preview: {content_preview[:200]}")
+        except Exception as e:
+            logMessage(f"⚠️ Could not verify file contents: {str(e)}")
         
         return store_path, filename
         
@@ -325,6 +363,8 @@ def generate_static_page(business_data):
 def business_registration():
     # Accept JSON or form-encoded
     data = request.get_json(silent=True) or (request.form.to_dict() if request.form else {})
+    logMessage("=" * 80)
+    logMessage("🚀 NEW BUSINESS REGISTRATION REQUEST")
     logMessage("POST data: " + str({k: v for k, v in data.items() if k != 'password'}))
 
     # Extract and normalize inputs
@@ -351,6 +391,11 @@ def business_registration():
     latitude         = none_if_empty(latitude_raw)
     longitude        = none_if_empty(longitude_raw)
 
+    # ✅ Log city value immediately after extraction
+    logMessage(f"🔍 CITY VALUE EXTRACTED FROM REQUEST: '{city}'")
+    logMessage(f"   - City is empty: {city == ''}")
+    logMessage(f"   - City length: {len(city)}")
+
     # Basic validation
     required = {
         "businessName": businessName,
@@ -362,9 +407,11 @@ def business_registration():
     }
     missing = [k for k, v in required.items() if not v]
     if missing:
+        logMessage(f"❌ Validation failed - Missing fields: {missing}")
         return jsonify({"status": "error", "message": f"Missing required fields: {', '.join(missing)}"}), 400
 
     if len(password) < 6:
+        logMessage(f"❌ Validation failed - Password too short")
         return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
 
     password_hash = md5_hash(password)
@@ -372,6 +419,12 @@ def business_registration():
     happy_hours_id = secrets.token_hex(8)
     token          = secrets.token_hex(16)
     verified       = 0
+
+    logMessage(f"✅ Validation passed - Proceeding with registration")
+    logMessage(f"   - Business: {businessName}")
+    logMessage(f"   - City: {city}")
+    logMessage(f"   - Email: {email}")
+    logMessage(f"   - Happy Hours ID: {happy_hours_id}")
 
     sql = """
         INSERT INTO happy_hours_global_test
@@ -410,14 +463,16 @@ def business_registration():
                 # Check if email already exists
                 cursor.execute("SELECT email FROM happy_hours_global_test WHERE email = %s", (email,))
                 if cursor.fetchone():
+                    logMessage(f"❌ Registration failed - Email already exists: {email}")
                     return jsonify({"status": "error", "message": "Email already registered"}), 400
                 
                 cursor.execute(sql, params)
             conn.commit()
 
-        logMessage(f"✅ Insert successful for email: {email} (id={happy_hours_id})")
+        logMessage(f"✅ Database insert successful for email: {email} (id={happy_hours_id})")
 
         # ✅ Generate static business page with all data including state
+        logMessage(f"📄 Starting static page generation...")
         business_data = {
             'happy_hours_id': happy_hours_id,
             'businessName': businessName,
@@ -436,10 +491,16 @@ def business_registration():
             'longitude': longitude
         }
         
+        logMessage(f"🔍 Business data being passed to page generator:")
+        logMessage(f"   - City: '{business_data['city']}'")
+        logMessage(f"   - Business Name: {business_data['businessName']}")
+        
         filepath, filename = generate_static_page(business_data)
         
         if filepath:
             logMessage(f"✅ Page generation successful: {filename}")
+            logMessage(f"   - File path: {filepath}")
+            logMessage(f"   - Expected header: '{city} Happy Hours'")
         else:
             logMessage(f"⚠️ Page generation failed but registration succeeded")
 
@@ -457,7 +518,7 @@ def business_registration():
             with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20) as server:
                 server.sendmail(FROM_EMAIL, [email], msg.as_string())
 
-            logMessage(f"✅ Mail sent to {email}")
+            logMessage(f"✅ Verification email sent to {email}")
 
             # Send SMS via TextBee (best-effort)
             if phone:
@@ -467,16 +528,22 @@ def business_registration():
         except Exception as e:
             logMessage(f"⚠️ Mail/SMS step failed for {email}: {str(e)}")
 
+        logMessage(f"✅ Registration process completed successfully")
+        logMessage("=" * 80)
+
         return jsonify({
             "status": "success", 
             "message": "Business registered successfully. Verification email & SMS sent.", 
             "id": happy_hours_id,
             "page_created": filepath is not None,
-            "filename": filename
+            "filename": filename,
+            "city": city,
+            "header_text": f"{city} Happy Hours"
         }), 200
 
     except Exception as e:
         logMessage(f"❌ DB insert failed: {repr(e)}")
         import traceback
         logMessage(traceback.format_exc())
+        logMessage("=" * 80)
         return jsonify({"status": "error", "message": f"DB insert failed: {str(e)}"}), 500

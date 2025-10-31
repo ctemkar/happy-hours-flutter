@@ -1,38 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+  <!-- Base href gets replaced by --base-href during flutter build -->
+  <base href="/" />
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+  <!-- Primary SEO -->
+  <title>Love Happy Hours | Find the best happy hour deals near you</title>
+  <meta name="description" content="Discover and compare happy hour deals near you. Search by city, time, venue, and offers. Real-time bar specials, maps, and categories." />
+  <link rel="canonical" href="https://app.lovehappyhours.com/" />
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/">
+  <!-- Open Graph (Facebook, LinkedIn, etc.) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Love Happy Hours" />
+  <meta property="og:title" content="Love Happy Hours | Find the best happy hour deals near you" />
+  <meta property="og:description" content="Discover and compare happy hour deals near you. Search by city, time, venue, and offers." />
+  <meta property="og:url" content="https://app.lovehappyhours.com/" />
+  <meta property="og:image" content="https://app.lovehappyhours.com/og/default.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Love Happy Hours | Find the best happy hour deals near you" />
+  <meta name="twitter:description" content="Discover and compare happy hour deals near you. Search by city, time, venue, and offers." />
+  <meta name="twitter:image" content="https://app.lovehappyhours.com/og/default.png" />
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="happy_hours_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <!-- PWA / iOS -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Love Happy Hours" />
+  <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
 
-  <title>happy_hours_app</title>
-  <link rel="manifest" href="manifest.json">
+  <!-- Manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Performance hints -->
+  <link rel="preload" as="script" href="main.dart.js" />
+  <!-- If you host fonts or hero images, consider preloading them too -->
+  <!-- <link rel="preload" as="image" href="/images/hero.webp" imagesrcset="/images/hero.webp" /> -->
+
+  <!-- Robots and sitemap (informative for humans; robots find robots.txt at /robots.txt) -->
+  <meta name="robots" content="index,follow" />
+
+  <!-- Optional: Basic Site JSON-LD (can expand per route dynamically) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Love Happy Hours",
+    "url": "https://app.lovehappyhours.com/",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://app.lovehappyhours.com/search?q={query}",
+      "query-input": "required name=query"
+    }
+  }
+  </script>
 </head>
 <body>
+  <!-- Flutter bootstrap -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
