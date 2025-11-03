@@ -222,7 +222,7 @@ class _BusinessLoginPageState extends State<BusinessLoginPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const BusinessRegistrationPage(),
+                    builder: (_) => const BusinessRegistrationScreen(),
                   ),
                 );
               },

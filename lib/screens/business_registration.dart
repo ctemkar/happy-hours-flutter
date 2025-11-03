@@ -1,516 +1,677 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List; // ✅ Added Uint8List
+import 'dart:typed_data'; // ✅ Added this import
 
-class BusinessRegistrationPage extends StatefulWidget {
-  const BusinessRegistrationPage({super.key});
+class BusinessRegistrationScreen extends StatefulWidget {
+  const BusinessRegistrationScreen({Key? key}) : super(key: key);
 
   @override
-  State<BusinessRegistrationPage> createState() => _BusinessRegistrationPageState();
+  State<BusinessRegistrationScreen> createState() =>
+      _BusinessRegistrationScreenState();
 }
 
-class _BusinessRegistrationPageState extends State<BusinessRegistrationPage> {
+class _BusinessRegistrationScreenState
+    extends State<BusinessRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
-  final TextEditingController businessNameController = TextEditingController();
-  final TextEditingController categoryController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
-  final TextEditingController cityController = TextEditingController();
-  final TextEditingController countryController = TextEditingController();
-  final TextEditingController stateController = TextEditingController();
-  final TextEditingController pinController = TextEditingController();
-  final TextEditingController openHoursController = TextEditingController();
-  final TextEditingController happyHourStartController = TextEditingController();
-  final TextEditingController happyHourEndController = TextEditingController();
-  final TextEditingController happyHoursYesNoController = TextEditingController();
-  final TextEditingController remarkController = TextEditingController();
-  final TextEditingController latitudeController = TextEditingController();
-  final TextEditingController longitudeController = TextEditingController();
+  // Text Controllers
+  final TextEditingController _businessNameController = TextEditingController();
+  final TextEditingController _ownerNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _countryController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _openHoursController = TextEditingController();
+  final TextEditingController _happyHourStartController = TextEditingController();
+  final TextEditingController _happyHourEndController = TextEditingController();
+  final TextEditingController _remarkController = TextEditingController();
+  final TextEditingController _latitudeController = TextEditingController();
+  final TextEditingController _longitudeController = TextEditingController();
 
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  // Dropdown values
+  String? _selectedCategory;
+  String _happyHourYesNo = "1";
 
-  // Business categories support
-  final List<String> businessCategories = <String>[
-    'Bar',
-    'Pub',
-    'Cafe',
+  // Image picker
+  XFile? _selectedImage;
+  Uint8List? _imageBytes; // ✅ Store image bytes for preview
+  final ImagePicker _picker = ImagePicker();
+
+  bool _isLoading = false;
+
+  final List<String> _categories = [
     'Restaurant',
+    'Bar',
+    'Cafe',
+    'Pub',
     'Lounge',
-    'Brewery',
-    'Wine Bar',
     'Club',
-    'Hotel Bar',
-    'Sports Bar',
-    'Rooftop',
-    'Other',
+    'Hotel',
+    'Other'
   ];
-  String? selectedCategory;
 
-  Future<void> registerBusiness() async {
-    final uri = Uri.parse("https://app.lovehappyhours.com/happy-hours-api/business_registration");
-    
-    final body = {
-      "businessName": businessNameController.text,
-      "ownerName": nameController.text,
-      "email": emailController.text,
-      "phone": phoneController.text,
-      "password": passwordController.text,
-      "address": addressController.text,
-      "city": cityController.text,
-      "state": stateController.text,
-      "country": countryController.text,
-      "pin": pinController.text,
-      "category": categoryController.text,
-      "description": descriptionController.text,
-      "open_hours": openHoursController.text,
-      "happy_hour_start": happyHourStartController.text,
-      "happy_hour_end": happyHourEndController.text,
-      "happy_hour_yes_no": happyHoursYesNoController.text,
-      "remark": remarkController.text,
-      "latitude": latitudeController.text,
-      "longitude": longitudeController.text,
-    };
+  @override
+  void dispose() {
+    _businessNameController.dispose();
+    _ownerNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pinController.dispose();
+    _countryController.dispose();
+    _descriptionController.dispose();
+    _openHoursController.dispose();
+    _happyHourStartController.dispose();
+    _happyHourEndController.dispose();
+    _remarkController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    super.dispose();
+  }
 
+  // ✅ Improved image picker with immediate preview
+  Future<void> _pickImage() async {
     try {
-      final response = await http.post(
-        uri,
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(body),
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedImage = pickedFile;
+          _imageBytes = bytes; // ✅ Store bytes for immediate preview
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? "Server responded.")),
-        );
-
-        // Clear form on success
-        if (data['status'] == 'success') {
-          _formKey.currentState?.reset();
-          nameController.clear();
-          emailController.clear();
-          phoneController.clear();
-          passwordController.clear();
-          confirmPasswordController.clear();
-          businessNameController.clear();
-          categoryController.clear();
-          selectedCategory = null;
-          descriptionController.clear();
-          addressController.clear();
-          cityController.clear();
-          countryController.clear();
-          stateController.clear();
-          pinController.clear();
-          openHoursController.clear();
-          happyHourStartController.clear();
-          happyHourEndController.clear();
-          happyHoursYesNoController.clear();
-          remarkController.clear();
-          latitudeController.clear();
-          longitudeController.clear();
-          setState(() {});
-        }
-      } else {
-        // Improved error parsing to display backend message
-        String serverMsg = "Server error: ${response.statusCode}";
-        try {
-          final data = json.decode(response.body);
-          if (data is Map && data['message'] != null) {
-            serverMsg = data['message'].toString();
-          }
-        } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(serverMsg)),
+          const SnackBar(content: Text('Image selected successfully!')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text('Error picking image: $e')),
       );
     }
   }
 
-  // Auto-geocoding using OpenStreetMap Nominatim (no key required).
-  Future<Map<String, String>?> _geocodeFromAddress({
-    required String address,
-    required String city,
-    String? state,
-    String? country,
-    String? pin,
-  }) async {
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+      _imageBytes = null; // ✅ Clear bytes too
+    });
+  }
+
+  Future<void> _registerBusiness() async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      final q = [
-        address,
-        if (city.isNotEmpty) city,
-        if (state != null && state.isNotEmpty) state,
-        if (country != null && country.isNotEmpty) country,
-        if (pin != null && pin.isNotEmpty) pin,
-      ].where((e) => e != null && e.toString().trim().isNotEmpty).join(', ');
-
-      if (q.isEmpty) return null;
-
-      final uri = Uri.parse("https://nominatim.openstreetmap.org/search").replace(queryParameters: {
-        "q": q,
-        "format": "json",
-        "limit": "1",
-      });
-
-      final res = await http.get(
-        uri,
-        headers: {
-          "User-Agent": "HappyHoursApp/1.0 (contact: support@lovehappyhours.com)",
-        },
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://customercallsapp.com/prod/customercallsapp/business_registration.php'),
       );
 
-      if (res.statusCode == 200) {
-        final decoded = json.decode(res.body);
-        if (decoded is List && decoded.isNotEmpty) {
-          final first = decoded.first;
-          final lat = first["lat"]?.toString();
-          final lon = first["lon"]?.toString();
-          if (lat != null && lon != null) {
-            return {"lat": lat, "lon": lon};
+      request.fields['businessName'] = _businessNameController.text.trim();
+      request.fields['ownerName'] = _ownerNameController.text.trim();
+      request.fields['email'] = _emailController.text.trim();
+      request.fields['phone'] = _phoneController.text.trim();
+      request.fields['password'] = _passwordController.text;
+      request.fields['address'] = _addressController.text.trim();
+      request.fields['city'] = _cityController.text.trim();
+      request.fields['state'] = _stateController.text.trim();
+      request.fields['pin'] = _pinController.text.trim();
+      request.fields['country'] = _countryController.text.trim();
+      request.fields['category'] = _selectedCategory ?? '';
+      request.fields['description'] = _descriptionController.text.trim();
+      request.fields['open_hours'] = _openHoursController.text.trim();
+      request.fields['happy_hour_start'] = _happyHourStartController.text.trim();
+      request.fields['happy_hour_end'] = _happyHourEndController.text.trim();
+      request.fields['happy_hour_yes_no'] = _happyHourYesNo;
+      request.fields['remark'] = _remarkController.text.trim();
+      request.fields['latitude'] = _latitudeController.text.trim();
+      request.fields['longitude'] = _longitudeController.text.trim();
+
+      // Add image file
+      if (_selectedImage != null && _imageBytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'business_image',
+            _imageBytes!,
+            filename: _selectedImage!.name,
+          ),
+        );
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        var jsonResponse = json.decode(response.body);
+        
+        if (jsonResponse['status'] == 'success') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(jsonResponse['message'] ?? 'Registration successful!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            
+            _formKey.currentState!.reset();
+            _businessNameController.clear();
+            _ownerNameController.clear();
+            _emailController.clear();
+            _phoneController.clear();
+            _passwordController.clear();
+            _addressController.clear();
+            _cityController.clear();
+            _stateController.clear();
+            _pinController.clear();
+            _countryController.clear();
+            _descriptionController.clear();
+            _openHoursController.clear();
+            _happyHourStartController.clear();
+            _happyHourEndController.clear();
+            _remarkController.clear();
+            _latitudeController.clear();
+            _longitudeController.clear();
+            setState(() {
+              _selectedCategory = null;
+              _happyHourYesNo = "1";
+              _selectedImage = null;
+              _imageBytes = null; // ✅ Clear bytes
+            });
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(jsonResponse['message'] ?? 'Registration failed'),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Server error: ${response.statusCode}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-    } catch (_) {
-      // Ignore and let caller proceed without coordinates
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-    return null;
-  }
-
-  @override
-  void dispose() {
-    nameController.dispose();
-    emailController.dispose();
-    phoneController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-    businessNameController.dispose();
-    categoryController.dispose();
-    descriptionController.dispose();
-    addressController.dispose();
-    cityController.dispose();
-    countryController.dispose();
-    stateController.dispose();
-    pinController.dispose();
-    openHoursController.dispose();
-    happyHourStartController.dispose();
-    happyHourEndController.dispose();
-    happyHoursYesNoController.dispose();
-    remarkController.dispose();
-    latitudeController.dispose();
-    longitudeController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Business Registration", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF6a0dad),
-        centerTitle: true,
-      ),
-      body: Container(
-        padding: const EdgeInsets.all(20),
-        color: const Color(0xFFfdfbff),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                const Text(
-                  "Register Your Business",
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF6a0dad),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-
-                _buildTextField(controller: nameController, label: "Full Name", icon: Icons.person),
-                _buildTextField(controller: emailController, label: "Email", icon: Icons.email, keyboardType: TextInputType.emailAddress),
-                _buildTextField(controller: phoneController, label: "Phone", icon: Icons.phone, keyboardType: TextInputType.phone),
-
-                // Password field
-                _buildPasswordField(
-                  controller: passwordController,
-                  label: "Password",
-                  icon: Icons.lock,
-                  obscureText: _obscurePassword,
-                  onToggleVisibility: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                ),
-
-                // Confirm Password field
-                _buildPasswordField(
-                  controller: confirmPasswordController,
-                  label: "Confirm Password",
-                  icon: Icons.lock_outline,
-                  obscureText: _obscureConfirmPassword,
-                  onToggleVisibility: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Please confirm your password";
-                    }
-                    if (value != passwordController.text) {
-                      return "Passwords do not match";
-                    }
-                    return null;
-                  },
-                ),
-
-                const Divider(),
-
-                _buildTextField(controller: businessNameController, label: "Business Name", icon: Icons.store),
-
-                // Business Category with tooltip + dropdown + validator
-                _buildCategoryField(),
-
-                _buildTextField(controller: descriptionController, label: "Business Description", icon: Icons.description),
-                _buildTextField(controller: addressController, label: "Address", icon: Icons.location_on),
-                _buildTextField(controller: cityController, label: "City", icon: Icons.location_city),
-                _buildTextField(controller: countryController, label: "Country", icon: Icons.flag),
-                _buildTextField(controller: stateController, label: "State", icon: Icons.map),
-                _buildTextField(controller: pinController, label: "PIN Code", icon: Icons.pin, keyboardType: TextInputType.number),
-
-                const Divider(),
-
-                _buildTextField(controller: openHoursController, label: "Open Hours", icon: Icons.access_time),
-                _buildTextField(controller: happyHourStartController, label: "Happy Hour Start", icon: Icons.timer),
-                _buildTextField(controller: happyHourEndController, label: "Happy Hour End", icon: Icons.timer_off),
-
-                // Happy Hours Available (1/0) with tooltip and validation
-                _buildHappyHoursField(),
-
-                _buildTextField(controller: remarkController, label: "Remarks", icon: Icons.note),
-
-                const Divider(),
-
-                // Latitude/Longitude optional
-                _buildTextField(
-                  controller: latitudeController,
-                  label: "Latitude (optional)",
-                  icon: Icons.my_location,
-                  validator: (_) => null,
-                ),
-                _buildTextField(
-                  controller: longitudeController,
-                  label: "Longitude (optional)",
-                  icon: Icons.location_searching,
-                  validator: (_) => null,
-                ),
-
-                const SizedBox(height: 30),
-
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      // Attempt geocoding if coordinates not provided
-                      if (latitudeController.text.isEmpty || longitudeController.text.isEmpty) {
-                        final result = await _geocodeFromAddress(
-                          address: addressController.text,
-                          city: cityController.text,
-                          state: stateController.text,
-                          country: countryController.text,
-                          pin: pinController.text,
-                        );
-                        if (result != null) {
-                          latitudeController.text = result["lat"]!;
-                          longitudeController.text = result["lon"]!;
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Could not auto-detect location from address. Proceeding without coordinates.")),
-                          );
-                        }
-                      }
-                      await registerBusiness();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6a0dad),
-                    padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text(
-                    "Register",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        title: const Text(
+          'Business Registration',
+          style: TextStyle(color: Colors.white),
         ),
+        backgroundColor: Colors.deepPurple,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: const Color(0xFF6a0dad)),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Color(0xFF6a0dad), width: 2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        validator: validator ?? (value) => value == null || value.isEmpty ? "Please enter $label" : null,
-      ),
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required bool obscureText,
-    required VoidCallback onToggleVisibility,
-    String? Function(String?)? validator,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: const Color(0xFF6a0dad)),
-          suffixIcon: IconButton(
-            icon: Icon(
-              obscureText ? Icons.visibility : Icons.visibility_off,
-              color: const Color(0xFF6a0dad),
-            ),
-            onPressed: onToggleVisibility,
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Color(0xFF6a0dad), width: 2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        validator: validator ?? (value) {
-          if (value == null || value.isEmpty) {
-            return "Please enter $label";
-          }
-          if (value.length < 6) {
-            return "Password must be at least 6 characters";
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  // Category field with tooltip and validation
-  Widget _buildCategoryField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: FormField<String>(
-        validator: (_) {
-          if ((categoryController.text).trim().isEmpty) {
-            return "Please select Business Category";
-          }
-          return null;
-        },
-        builder: (state) {
-          return InputDecorator(
-            decoration: InputDecoration(
-              labelText: "Business Category",
-              prefixIcon: const Icon(Icons.category, color: Color(0xFF6a0dad)),
-              suffixIcon: Tooltip(
-                message: businessCategories.join(', '),
-                triggerMode: TooltipTriggerMode.tap,
-                child: const Icon(Icons.info_outline, color: Color(0xFF6a0dad)),
-              ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color(0xFF6a0dad), width: 2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              errorText: state.errorText,
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: selectedCategory,
-                hint: const Text("Select a category"),
-                items: businessCategories.map((c) {
-                  return DropdownMenuItem<String>(
-                    value: c,
-                    child: Text(c),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedCategory = val;
-                    categoryController.text = val ?? '';
-                    state.didChange(val);
-                  });
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Business Name
+              TextFormField(
+                controller: _businessNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Business Name *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Business name is required';
+                  }
+                  return null;
                 },
               ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+              const SizedBox(height: 16),
 
-  // Happy Hours Available field 1/0 with tooltip and validation
-  Widget _buildHappyHoursField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: happyHoursYesNoController,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          labelText: "Happy Hours Available (1 for Yes, 0 for No)",
-          prefixIcon: const Icon(Icons.event_available, color: Color(0xFF6a0dad)),
-          suffixIcon: const Tooltip(
-            message: "Enter 1 for Yes, 0 for No",
-            triggerMode: TooltipTriggerMode.tap,
-            child: Icon(Icons.info_outline, color: Color(0xFF6a0dad)),
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Color(0xFF6a0dad), width: 2),
-            borderRadius: BorderRadius.circular(12),
+              // Owner Name
+              TextFormField(
+                controller: _ownerNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Owner Name *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Owner name is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Email
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      .hasMatch(value)) {
+                    return 'Enter a valid email';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Phone
+              TextFormField(
+                controller: _phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+
+              // Password
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Password *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Password is required';
+                  }
+                  if (value.length < 6) {
+                    return 'Password must be at least 6 characters';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Address
+              TextFormField(
+                controller: _addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+
+              // City
+              TextFormField(
+                controller: _cityController,
+                decoration: const InputDecoration(
+                  labelText: 'City *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_city),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'City is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // State
+              TextFormField(
+                controller: _stateController,
+                decoration: const InputDecoration(
+                  labelText: 'State',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.map),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Pin
+              TextFormField(
+                controller: _pinController,
+                decoration: const InputDecoration(
+                  labelText: 'PIN Code',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.pin),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+
+              // Country
+              TextFormField(
+                controller: _countryController,
+                decoration: const InputDecoration(
+                  labelText: 'Country',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.flag),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Category Dropdown
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(
+                  labelText: 'Category *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: _categories.map((String category) {
+                  return DropdownMenuItem<String>(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedCategory = newValue;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Category is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // ✅ Business Image Upload Section - FIXED
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.image, color: Colors.deepPurple),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Business Image',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // ✅ FIXED: Direct image preview using stored bytes
+                    if (_imageBytes != null)
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              _imageBytes!,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              onPressed: _removeImage,
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Container(
+                        height: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.image_outlined, size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text(
+                                'No image selected',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.upload),
+                      label: Text(_selectedImage == null ? 'Select Image' : 'Change Image'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Supported formats: JPG, PNG, GIF, WEBP',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Description
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              // Open Hours
+              TextFormField(
+                controller: _openHoursController,
+                decoration: const InputDecoration(
+                  labelText: 'Open Hours',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.access_time),
+                  hintText: 'e.g., Mon-Fri: 9AM-10PM',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Happy Hour Start
+              TextFormField(
+                controller: _happyHourStartController,
+                decoration: const InputDecoration(
+                  labelText: 'Happy Hour Start',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.schedule),
+                  hintText: 'e.g., 5:00 PM',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Happy Hour End
+              TextFormField(
+                controller: _happyHourEndController,
+                decoration: const InputDecoration(
+                  labelText: 'Happy Hour End',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.schedule),
+                  hintText: 'e.g., 7:00 PM',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Happy Hour Yes/No with tooltip
+              Tooltip(
+                message: '1 = Yes, 0 = No',
+                child: DropdownButtonFormField<String>(
+                  value: _happyHourYesNo,
+                  decoration: const InputDecoration(
+                    labelText: 'Happy Hour Available',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.celebration),
+                    suffixIcon: Icon(Icons.info_outline, size: 20),
+                  ),
+                  items: const [
+                    DropdownMenuItem<String>(
+                      value: '1',
+                      child: Text('1 (Yes)'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: '0',
+                      child: Text('0 (No)'),
+                    ),
+                  ],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _happyHourYesNo = newValue ?? '1';
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Remark
+              TextFormField(
+                controller: _remarkController,
+                decoration: const InputDecoration(
+                  labelText: 'Remark',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.note),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+
+              // Latitude
+              TextFormField(
+                controller: _latitudeController,
+                decoration: const InputDecoration(
+                  labelText: 'Latitude',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.my_location),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 16),
+
+              // Longitude
+              TextFormField(
+                controller: _longitudeController,
+                decoration: const InputDecoration(
+                  labelText: 'Longitude',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.my_location),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 24),
+
+              // Register Button
+              ElevatedButton(
+                onPressed: _isLoading ? null : _registerBusiness,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Register Business'),
+              ),
+            ],
           ),
         ),
-        validator: (value) {
-          if (value == null || value.isEmpty) return "Please enter Happy Hours Available";
-          if (value != '0' && value != '1') return "Only 1 (Yes) or 0 (No) allowed";
-          return null;
-        },
       ),
     );
   }

@@ -25,7 +25,7 @@ class HappyHoursApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       routes: {
         "/userHome": (context) => const HappyHoursScreen(),
-        "/businessRegistration": (context) => const BusinessRegistrationPage(),
+        "/businessRegistration": (context) =>  const BusinessRegistrationScreen(),
         "/businessLogin": (context) => const BusinessLoginPage(),
         "/landing": (context) => const LandingPage(),
       },
