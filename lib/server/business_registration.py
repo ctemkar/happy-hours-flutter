@@ -28,7 +28,14 @@ SMTP_PORT = 25
 
 VERIFY_LINK_BASE = "https://customercallsapp.com/prod/customercallsapp/verified.php"
 
-# ✅ FIXED: Write to BOTH locations to match API expectations
+# ✅ Image upload directory
+BUSINESS_IMAGES_DIR = "/var/www/app.lovehappyhours.com/business_images"
+os.makedirs(BUSINESS_IMAGES_DIR, exist_ok=True)
+
+# ✅ Allowed image extensions (only jpg, jpeg, png)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+
+# ✅ Write to BOTH locations to match API expectations
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 STORE_DIR = os.path.join(BASE_DIR, 'output_html_store')  # API reads from here
 OUTPUT_DIR = "/var/www/app.lovehappyhours.com/alpha/output_html"  # Web serves from here
@@ -50,10 +57,15 @@ def logMessage(message: str):
         logger.info(message)
 
 # Log paths at startup
+logger.info(f"📁 BUSINESS_IMAGES_DIR => {BUSINESS_IMAGES_DIR}")
 logger.info(f"📁 STORE_DIR => {STORE_DIR}")
 logger.info(f"📁 OUTPUT_DIR => {OUTPUT_DIR}")
 
 # ================== Helpers ==================
+# ✅ Image file validation (only jpg, jpeg, png)
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def as_text(v, default=""):
     if v is None:
         return default
@@ -107,22 +119,20 @@ def sendSMS_TextBee(toPhone: str, textMessage: str) -> bool:
         return False
 
 # ================== Static Page Generator ==================
-def generate_static_page(business_data):
+def generate_static_page(business_data, image_filename=None):
     """
     Generate a static HTML page for the business using the provided data.
-    ✅ FIXED: Uses secure_filename and writes to BOTH directories.
-    ✅ ENHANCED: Added extensive logging for city name debugging
+    ✅ Uses secure_filename and writes to BOTH directories.
+    ✅ Includes uploaded image if available
     """
     try:
-        # ✅ Extract city with detailed logging
+        # Extract city with detailed logging
         city_raw = business_data.get('city', '')
         city = as_text(city_raw, 'City')  # Default to 'City' if empty
         
         logMessage(f"🔍 DEBUG - City extraction:")
         logMessage(f"   - Raw city value: '{city_raw}'")
         logMessage(f"   - Processed city value: '{city}'")
-        logMessage(f"   - City type: {type(city)}")
-        logMessage(f"   - City length: {len(city)}")
         
         # Extract other data with safe defaults
         business_name = as_text(business_data.get('businessName', ''), 'Business')
@@ -158,7 +168,16 @@ def generate_static_page(business_data):
         from urllib.parse import quote
         map_query = quote(full_address) if full_address else f"{latitude},{longitude}" if latitude and longitude else ""
         
-        # ✅ Log the header that will be generated
+        # ✅ Image HTML construction
+        image_html = ""
+        if image_filename:
+            image_url = f"https://app.lovehappyhours.com/business_images/{image_filename}"
+            image_html = f'<img src="{image_url}" alt="{business_name}" class="hero-img" />'
+            logMessage(f"✅ Image will be displayed: {image_url}")
+        else:
+            image_html = '<div class="hero-placeholder">Image Coming Soon</div>'
+        
+        # Log the header that will be generated
         header_text = f"{city} Happy Hours"
         logMessage(f"🎯 HEADER TEXT WILL BE: '{header_text}'")
         
@@ -247,7 +266,7 @@ def generate_static_page(business_data):
           </div>
         </div>
         <div class="hero-media">
-          <div class="hero-placeholder">Image Coming Soon</div>
+          {image_html}
         </div>
       </div>
     </section>
@@ -315,12 +334,12 @@ def generate_static_page(business_data):
 </body>
 </html>"""
 
-        # ✅ FIXED: Use secure_filename to match API expectations
+        # ✅ Use secure_filename to match API expectations
         filename = secure_filename(f"{business_name}.html")
         
         logMessage(f"📝 Generated filename: {filename}")
         
-        # ✅ FIXED: Write to BOTH locations
+        # ✅ Write to BOTH locations
         store_path = os.path.join(STORE_DIR, filename)
         output_path = os.path.join(OUTPUT_DIR, filename)
         
@@ -335,11 +354,9 @@ def generate_static_page(business_data):
         
         logMessage(f"✅ File copied to OUTPUT_DIR: {output_path}")
         logMessage(f"✅ Static page created in BOTH locations: {filename}")
-        logMessage(f"   - STORE: {store_path}")
-        logMessage(f"   - WEB: {output_path}")
         logMessage(f"🎯 FINAL CONFIRMATION - Header contains: '{city} Happy Hours'")
         
-        # ✅ Verify file contents by reading first 500 chars
+        # Verify file contents by reading first 500 chars
         try:
             with open(output_path, 'r', encoding='utf-8') as f:
                 content_preview = f.read(1000)
@@ -361,11 +378,26 @@ def generate_static_page(business_data):
 
 # ================== Main Route Function ==================
 def business_registration():
-    # Accept JSON or form-encoded
-    data = request.get_json(silent=True) or (request.form.to_dict() if request.form else {})
     logMessage("=" * 80)
-    logMessage("🚀 NEW BUSINESS REGISTRATION REQUEST")
-    logMessage("POST data: " + str({k: v for k, v in data.items() if k != 'password'}))
+    logMessage("🚀 NEW BUSINESS REGISTRATION REQUEST RECEIVED")
+    
+    # ✅ Log request details
+    logMessage(f"📥 Request Method: {request.method}")
+    logMessage(f"📥 Content-Type: {request.content_type}")
+    logMessage(f"📥 Request Headers: {dict(request.headers)}")
+    
+    # ✅ Check what data we're receiving
+    logMessage(f"📥 request.form keys: {list(request.form.keys())}")
+    logMessage(f"📥 request.files keys: {list(request.files.keys())}")
+    
+    json_data = request.get_json(silent=True)
+    logMessage(f"📥 request.get_json(silent=True): {json_data}")
+    
+    # ✅ Accept both JSON and form-data (for image upload)
+    data = json_data or (request.form.to_dict() if request.form else {})
+    
+    logMessage(f"📥 Extracted data keys: {list(data.keys())}")
+    logMessage(f"📥 POST data (without password): {str({k: v for k, v in data.items() if k != 'password'})}")
 
     # Extract and normalize inputs
     businessName     = as_text(data.get("businessName"))
@@ -383,7 +415,7 @@ def business_registration():
     openHours        = as_text(data.get("open_hours"))
     happyHourStart   = as_text(data.get("happy_hour_start"))
     happyHourEnd     = as_text(data.get("happy_hour_end"))
-    happyHourYesNo   = to_int_yes_no(data.get("happy_hour_yes_no", "No"))
+    happyHourYesNo   = to_int_yes_no(data.get("happy_hour_yes_no", "0"))
     remark           = as_text(data.get("remark"))
 
     latitude_raw     = data.get("latitude")
@@ -391,10 +423,18 @@ def business_registration():
     latitude         = none_if_empty(latitude_raw)
     longitude        = none_if_empty(longitude_raw)
 
-    # ✅ Log city value immediately after extraction
-    logMessage(f"🔍 CITY VALUE EXTRACTED FROM REQUEST: '{city}'")
-    logMessage(f"   - City is empty: {city == ''}")
-    logMessage(f"   - City length: {len(city)}")
+    # ✅ New: Google Marker (Map Link)
+    google_marker    = as_text(data.get("google_marker"))  # may be empty string
+
+    logMessage(f"🔍 EXTRACTED VALUES:")
+    logMessage(f"   - Business Name: '{businessName}'")
+    logMessage(f"   - Owner Name: '{ownerName}'")
+    logMessage(f"   - Email: '{email}'")
+    logMessage(f"   - City: '{city}'")
+    logMessage(f"   - State: '{state}'")
+    logMessage(f"   - Category: '{category}'")
+    logMessage(f"   - Password length: {len(password)}")
+    logMessage(f"   - Google Marker: '{google_marker}'")  # ✅ log new field
 
     # Basic validation
     required = {
@@ -414,23 +454,89 @@ def business_registration():
         logMessage(f"❌ Validation failed - Password too short")
         return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
 
+    logMessage(f"✅ Validation passed")
+
     password_hash = md5_hash(password)
 
     happy_hours_id = secrets.token_hex(8)
     token          = secrets.token_hex(16)
     verified       = 0
 
-    logMessage(f"✅ Validation passed - Proceeding with registration")
-    logMessage(f"   - Business: {businessName}")
-    logMessage(f"   - City: {city}")
-    logMessage(f"   - Email: {email}")
-    logMessage(f"   - Happy Hours ID: {happy_hours_id}")
+    logMessage(f"🆔 Generated happy_hours_id: {happy_hours_id}")
+    logMessage(f"🔑 Generated token: {token}")
 
+    # ✅ Handle image upload - SAVE TO FOLDER with businessName as filename
+    uploaded_image_filename = None
+    image_link_for_db = None  # ADDED for image_link
+    
+    logMessage(f"📸 Checking for image upload...")
+    logMessage(f"   - 'business_image' in request.files: {'business_image' in request.files}")
+    
+    if 'business_image' in request.files:
+        file = request.files['business_image']
+        logMessage(f"   - File object: {file}")
+        logMessage(f"   - File filename: {file.filename}")
+        logMessage(f"   - File content_type: {file.content_type if hasattr(file, 'content_type') else 'N/A'}")
+        
+        if file and file.filename:
+            logMessage(f"   - File has filename: {file.filename}")
+            
+            if allowed_file(file.filename):
+                logMessage(f"   - File extension is allowed")
+                
+                # Get file extension
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                logMessage(f"   - Extension: {ext}")
+                
+                # ✅ Validate extension (only jpg, jpeg, png allowed)
+                if ext not in ['jpg', 'jpeg', 'png']:
+                    logMessage(f"❌ Invalid image extension: {ext}. Only jpg, jpeg, png allowed.")
+                    return jsonify({"status": "error", "message": "Only JPG, JPEG, and PNG images are allowed"}), 400
+                
+                # ✅ Use businessName as filename (sanitized)
+                safe_business_name = secure_filename(businessName)
+                uploaded_image_filename = f"{safe_business_name}.{ext}"
+                image_path = os.path.join(BUSINESS_IMAGES_DIR, uploaded_image_filename)
+                
+                logMessage(f"   - Safe business name: {safe_business_name}")
+                logMessage(f"   - Image filename: {uploaded_image_filename}")
+                logMessage(f"   - Full image path: {image_path}")
+                logMessage(f"   - Directory exists: {os.path.exists(BUSINESS_IMAGES_DIR)}")
+                logMessage(f"   - Directory writable: {os.access(BUSINESS_IMAGES_DIR, os.W_OK)}")
+                
+                try:
+                    logMessage(f"   - Attempting to save file...")
+                    file.save(image_path)
+                    logMessage(f"✅ Image saved successfully to: {image_path}")
+                    logMessage(f"   - File exists after save: {os.path.exists(image_path)}")
+                    if os.path.exists(image_path):
+                        logMessage(f"   - File size: {os.path.getsize(image_path)} bytes")
+                    # ADDED for image_link: build full public URL for DB
+                    image_link_for_db = f"https://app.lovehappyhours.com/business_images/{uploaded_image_filename}"
+                    logMessage(f"   - Image link for DB: {image_link_for_db}")
+                except Exception as e:
+                    logMessage(f"❌ Image upload failed: {str(e)}")
+                    import traceback
+                    logMessage(traceback.format_exc())
+                    uploaded_image_filename = None
+                    image_link_for_db = None
+            else:
+                logMessage(f"   - File extension NOT allowed: {file.filename}")
+        else:
+            logMessage(f"   - File object has no filename")
+    else:
+        logMessage(f"ℹ️ No 'business_image' in request.files")
+
+    logMessage(f"📸 Image upload result: {uploaded_image_filename or 'None'}")
+
+    # ✅ Database INSERT (added Google_Marker column)
+    # ADDED for image_link: append image_link column and value at the end
     sql = """
         INSERT INTO happy_hours_global_test
-        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, city, country, Open_hours,
-         Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, Telephone, Remark, latitude, longitude, token, verified)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, 
+         city, country, Open_hours, Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, 
+         Telephone, Remark, latitude, longitude, token, verified, Google_Marker, image_link)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """
 
     params = (
@@ -453,25 +559,44 @@ def business_registration():
         latitude,
         longitude,
         token,
-        verified
+        verified,
+        google_marker,       # ✅ existing Google_Marker
+        image_link_for_db    # ADDED for image_link (None if no image uploaded)
     )
 
+    logMessage(f"💾 Attempting database insert...")
+    logMessage(f"   - SQL: {sql}")
+    logMessage(f"   - Params count: {len(params)}")
+    logMessage(f"   - Params: {params}")
+
     try:
+        logMessage(f"   - Connecting to database...")
         conn = get_db_connection()
+        logMessage(f"   - Database connection successful")
+        
         with conn:
             with conn.cursor() as cursor:
                 # Check if email already exists
+                logMessage(f"   - Checking if email exists: {email}")
                 cursor.execute("SELECT email FROM happy_hours_global_test WHERE email = %s", (email,))
-                if cursor.fetchone():
+                existing = cursor.fetchone()
+                
+                if existing:
                     logMessage(f"❌ Registration failed - Email already exists: {email}")
                     return jsonify({"status": "error", "message": "Email already registered"}), 400
                 
+                logMessage(f"   - Email is unique, proceeding with insert")
+                logMessage(f"   - Executing INSERT query...")
                 cursor.execute(sql, params)
+                logMessage(f"   - INSERT executed, rows affected: {cursor.rowcount}")
+                
+            logMessage(f"   - Committing transaction...")
             conn.commit()
+            logMessage(f"   - Transaction committed successfully")
 
         logMessage(f"✅ Database insert successful for email: {email} (id={happy_hours_id})")
 
-        # ✅ Generate static business page with all data including state
+        # ✅ Generate static business page
         logMessage(f"📄 Starting static page generation...")
         business_data = {
             'happy_hours_id': happy_hours_id,
@@ -491,16 +616,10 @@ def business_registration():
             'longitude': longitude
         }
         
-        logMessage(f"🔍 Business data being passed to page generator:")
-        logMessage(f"   - City: '{business_data['city']}'")
-        logMessage(f"   - Business Name: {business_data['businessName']}")
-        
-        filepath, filename = generate_static_page(business_data)
+        filepath, filename = generate_static_page(business_data, uploaded_image_filename)
         
         if filepath:
             logMessage(f"✅ Page generation successful: {filename}")
-            logMessage(f"   - File path: {filepath}")
-            logMessage(f"   - Expected header: '{city} Happy Hours'")
         else:
             logMessage(f"⚠️ Page generation failed but registration succeeded")
 
@@ -529,16 +648,20 @@ def business_registration():
             logMessage(f"⚠️ Mail/SMS step failed for {email}: {str(e)}")
 
         logMessage(f"✅ Registration process completed successfully")
+        logMessage(f"   - Database: ✅ Record inserted (Name={businessName})")
+        logMessage(f"   - Image: {'✅ Saved as ' + uploaded_image_filename if uploaded_image_filename else '⚠️ No image'}")
+        logMessage(f"   - Static page: {'✅ Created' if filepath else '⚠️ Failed'}")
         logMessage("=" * 80)
 
         return jsonify({
             "status": "success", 
-            "message": "Business registered successfully. Verification email & SMS sent.", 
+            "message": "Business Registration Successful",
             "id": happy_hours_id,
             "page_created": filepath is not None,
             "filename": filename,
-            "city": city,
-            "header_text": f"{city} Happy Hours"
+            "image_saved": uploaded_image_filename is not None,
+            "image_filename": uploaded_image_filename,
+            "image_path": f"{BUSINESS_IMAGES_DIR}/{uploaded_image_filename}" if uploaded_image_filename else None
         }), 200
 
     except Exception as e:
@@ -546,4 +669,4 @@ def business_registration():
         import traceback
         logMessage(traceback.format_exc())
         logMessage("=" * 80)
-        return jsonify({"status": "error", "message": f"DB insert failed: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Database error: {str(e)}"}), 500

@@ -35,6 +35,8 @@ class _BusinessRegistrationScreenState
   final TextEditingController _remarkController = TextEditingController();
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
+  // ✅ New: Map Link (Google Marker) controller
+  final TextEditingController _mapLinkController = TextEditingController();
 
   // Dropdown values
   String? _selectedCategory;
@@ -77,6 +79,7 @@ class _BusinessRegistrationScreenState
     _remarkController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
+    _mapLinkController.dispose(); // ✅ dispose new controller
     super.dispose();
   }
 
@@ -129,7 +132,7 @@ class _BusinessRegistrationScreenState
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('https://customercallsapp.com/prod/customercallsapp/business_registration.php'),
+        Uri.parse('https://app.lovehappyhours.com/happy-hours-api/business_registration'),
       );
 
       request.fields['businessName'] = _businessNameController.text.trim();
@@ -151,6 +154,8 @@ class _BusinessRegistrationScreenState
       request.fields['remark'] = _remarkController.text.trim();
       request.fields['latitude'] = _latitudeController.text.trim();
       request.fields['longitude'] = _longitudeController.text.trim();
+      // ✅ New: send google_marker
+      request.fields['google_marker'] = _mapLinkController.text.trim();
 
       // Add image file
       if (_selectedImage != null && _imageBytes != null) {
@@ -196,6 +201,7 @@ class _BusinessRegistrationScreenState
             _remarkController.clear();
             _latitudeController.clear();
             _longitudeController.clear();
+            _mapLinkController.clear(); // ✅ clear new field
             setState(() {
               _selectedCategory = null;
               _happyHourYesNo = "1";
@@ -647,6 +653,19 @@ class _BusinessRegistrationScreenState
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
+              const SizedBox(height: 16),
+
+              // ✅ New: Map Link (Google Marker)
+              TextFormField(
+                controller: _mapLinkController,
+                decoration: const InputDecoration(
+                  labelText: 'Map Link (Google Maps URL)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.map_outlined),
+                  hintText: 'Paste Google Maps link here',
+                ),
+              ),
+
               const SizedBox(height: 24),
 
               // Register Button
