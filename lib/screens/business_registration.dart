@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, Uint8List; // ✅ Added Uint8List
-import 'dart:typed_data'; // ✅ Added this import
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
+import 'dart:typed_data';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({Key? key}) : super(key: key);
@@ -35,7 +35,6 @@ class _BusinessRegistrationScreenState
   final TextEditingController _remarkController = TextEditingController();
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
-  // ✅ New: Map Link (Google Marker) controller
   final TextEditingController _mapLinkController = TextEditingController();
 
   // Dropdown values
@@ -44,20 +43,26 @@ class _BusinessRegistrationScreenState
 
   // Image picker
   XFile? _selectedImage;
-  Uint8List? _imageBytes; // ✅ Store image bytes for preview
+  Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
 
+  // ✅ Validation error messages for dynamic display
+  String? _openHoursError;
+  String? _happyHourStartError;
+  String? _happyHourEndError;
+  String? _happyHourYesNoError;
+
   final List<String> _categories = [
-    'Restaurant',
     'Bar',
     'Cafe',
-    'Pub',
-    'Lounge',
     'Club',
-    'Hotel',
-    'Other'
+    'Fast Food',
+    'Massage',
+    'Night Club',
+    'Restaurant',
+    'Spa'
   ];
 
   @override
@@ -79,11 +84,177 @@ class _BusinessRegistrationScreenState
     _remarkController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
-    _mapLinkController.dispose(); // ✅ dispose new controller
+    _mapLinkController.dispose();
     super.dispose();
   }
 
-  // ✅ Improved image picker with immediate preview
+  // ✅ Helper: Convert a "HH:mm" or "hh:mm AM/PM" string to minutes since midnight
+  int? _parseTimeToMinutes(String? timeText) {
+    if (timeText == null || timeText.trim().isEmpty) return null;
+
+    try {
+      final time = timeText.trim().toUpperCase();
+      final match = RegExp(r'(\d{1,2}):(\d{2})(?:\s*(AM|PM))?').firstMatch(time);
+      if (match == null) return null;
+
+      int hour = int.parse(match.group(1)!);
+      int minute = int.parse(match.group(2)!);
+      String? period = match.group(3);
+
+      if (period == 'PM' && hour != 12) hour += 12;
+      if (period == 'AM' && hour == 12) hour = 0;
+
+      return hour * 60 + minute;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ✅ Extract open hours "All Days 10:30 - 20:30" into start and end
+  Map<String, int?> _extractOpenHoursRange(String text) {
+    final match = RegExp(r'(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})').firstMatch(text);
+    if (match == null) return {'start': null, 'end': null};
+    return {
+      'start': _parseTimeToMinutes(match.group(1)),
+      'end': _parseTimeToMinutes(match.group(2)),
+    };
+  }
+
+  // ✅ Live validation for Happy Hour times vs Open Hours
+  void _validateHappyHourTimes() {
+    final openHours = _openHoursController.text.trim();
+    final happyStart = _happyHourStartController.text.trim();
+    final happyEnd = _happyHourEndController.text.trim();
+
+    // Reset errors
+    setState(() {
+      _openHoursError = null;
+      _happyHourStartError = null;
+      _happyHourEndError = null;
+    });
+
+    if (openHours.isEmpty || happyStart.isEmpty || happyEnd.isEmpty) return;
+
+    final openRange = _extractOpenHoursRange(openHours);
+    final openStart = openRange['start'];
+    final openEnd = openRange['end'];
+    final happyStartMins = _parseTimeToMinutes(happyStart);
+    final happyEndMins = _parseTimeToMinutes(happyEnd);
+
+    if (openStart == null || openEnd == null || happyStartMins == null || happyEndMins == null) {
+      return;
+    }
+
+    if (happyStartMins < openStart) {
+      setState(() {
+        _happyHourStartError = 'Happy Hour Start is before opening time';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Happy Hour Start is before opening time'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (happyEndMins > openEnd) {
+      setState(() {
+        _happyHourEndError = 'Happy Hour End is after closing time';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Happy Hour End is after closing time'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (happyEndMins <= happyStartMins) {
+      setState(() {
+        _happyHourEndError = 'Happy Hour End must be after Start';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Happy Hour End must be after Start'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // ✅ Live validation for Happy Hour Yes/No field
+  void _validateHappyHourYesNoField() {
+    final happyYesNo = _happyHourYesNo;
+    final happyStart = _happyHourStartController.text.trim();
+    final happyEnd = _happyHourEndController.text.trim();
+
+    setState(() {
+      _happyHourYesNoError = null;
+      _happyHourStartError = null;
+      _happyHourEndError = null;
+    });
+
+    if (happyYesNo == '0') {
+      // Case: user says "No" but entered times
+      if (happyStart.isNotEmpty || happyEnd.isNotEmpty) {
+        setState(() {
+          _happyHourYesNoError = 'You selected No but entered times';
+          _happyHourStartError = 'Remove this if Happy Hour is No';
+          _happyHourEndError = 'Remove this if Happy Hour is No';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ You selected No for Happy Hours, but entered times.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else if (happyYesNo == '1') {
+      // Case: user says "Yes" but missing times
+      if (happyStart.isEmpty && happyEnd.isEmpty) {
+        setState(() {
+          _happyHourStartError = 'Required when Happy Hour is Yes';
+          _happyHourEndError = 'Required when Happy Hour is Yes';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Happy Hour Start and End times are required when selected Yes.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else if (happyStart.isEmpty) {
+        setState(() {
+          _happyHourStartError = 'Required when Happy Hour is Yes';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Happy Hour Start is required when selected Yes.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else if (happyEnd.isEmpty) {
+        setState(() {
+          _happyHourEndError = 'Required when Happy Hour is Yes';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Happy Hour End is required when selected Yes.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ Combined validation trigger
+  void _runAllHappyHourValidations() {
+    _validateHappyHourYesNoField();
+    _validateHappyHourTimes();
+  }
+
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -97,7 +268,7 @@ class _BusinessRegistrationScreenState
         final bytes = await pickedFile.readAsBytes();
         setState(() {
           _selectedImage = pickedFile;
-          _imageBytes = bytes; // ✅ Store bytes for immediate preview
+          _imageBytes = bytes;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image selected successfully!')),
@@ -113,7 +284,7 @@ class _BusinessRegistrationScreenState
   void _removeImage() {
     setState(() {
       _selectedImage = null;
-      _imageBytes = null; // ✅ Clear bytes too
+      _imageBytes = null;
     });
   }
 
@@ -123,6 +294,72 @@ class _BusinessRegistrationScreenState
         const SnackBar(content: Text('Please fill all required fields')),
       );
       return;
+    }
+
+    // ✅ Run happy hour validation before registration
+    final happyYesNo = _happyHourYesNo;
+    final happyStart = _happyHourStartController.text.trim();
+    final happyEnd = _happyHourEndController.text.trim();
+    final openHours = _openHoursController.text.trim();
+
+    if (happyYesNo == '0' && (happyStart.isNotEmpty || happyEnd.isNotEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You selected No for Happy Hours, but entered times.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    } else if (happyYesNo == '1') {
+      if (happyStart.isEmpty || happyEnd.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter both Happy Hour Start and End times when Yes is selected.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    // ✅ Time range validation
+    if (openHours.isNotEmpty && happyStart.isNotEmpty && happyEnd.isNotEmpty) {
+      final openRange = _extractOpenHoursRange(openHours);
+      final openStart = openRange['start'];
+      final openEnd = openRange['end'];
+      final happyStartMins = _parseTimeToMinutes(happyStart);
+      final happyEndMins = _parseTimeToMinutes(happyEnd);
+
+      if (openStart != null &&
+          openEnd != null &&
+          happyStartMins != null &&
+          happyEndMins != null) {
+        if (happyStartMins < openStart) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Happy Hour Start cannot be before Opening Time!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        } else if (happyEndMins > openEnd) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Happy Hour End cannot be after Closing Time!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        } else if (happyEndMins <= happyStartMins) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Happy Hour End must be after Start time!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
     }
 
     setState(() {
@@ -154,7 +391,6 @@ class _BusinessRegistrationScreenState
       request.fields['remark'] = _remarkController.text.trim();
       request.fields['latitude'] = _latitudeController.text.trim();
       request.fields['longitude'] = _longitudeController.text.trim();
-      // ✅ New: send google_marker
       request.fields['google_marker'] = _mapLinkController.text.trim();
 
       // Add image file
@@ -201,12 +437,16 @@ class _BusinessRegistrationScreenState
             _remarkController.clear();
             _latitudeController.clear();
             _longitudeController.clear();
-            _mapLinkController.clear(); // ✅ clear new field
+            _mapLinkController.clear();
             setState(() {
               _selectedCategory = null;
               _happyHourYesNo = "1";
               _selectedImage = null;
-              _imageBytes = null; // ✅ Clear bytes
+              _imageBytes = null;
+              _openHoursError = null;
+              _happyHourStartError = null;
+              _happyHourEndError = null;
+              _happyHourYesNoError = null;
             });
           }
         } else {
@@ -445,7 +685,7 @@ class _BusinessRegistrationScreenState
               ),
               const SizedBox(height: 16),
 
-              // ✅ Business Image Upload Section - FIXED
+              // ✅ Business Image Upload Section
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -470,7 +710,6 @@ class _BusinessRegistrationScreenState
                     ),
                     const SizedBox(height: 12),
                     
-                    // ✅ FIXED: Direct image preview using stored bytes
                     if (_imageBytes != null)
                       Stack(
                         children: [
@@ -553,69 +792,146 @@ class _BusinessRegistrationScreenState
               ),
               const SizedBox(height: 16),
 
-              // Open Hours
+              // ✅ Open Hours with live validation trigger
               TextFormField(
                 controller: _openHoursController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Open Hours',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.access_time),
-                  hintText: 'e.g., Mon-Fri: 9AM-10PM',
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _openHoursError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _openHoursError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _openHoursError != null ? Colors.red : Colors.deepPurple,
+                      width: 2,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.access_time,
+                    color: _openHoursError != null ? Colors.red : null,
+                  ),
+                  hintText: 'e.g., All Days 10:30 - 20:30',
+                  errorText: _openHoursError,
                 ),
+                onChanged: (_) => _runAllHappyHourValidations(),
               ),
               const SizedBox(height: 16),
 
-              // Happy Hour Start
+              // ✅ Happy Hour Start with live validation and red border
               TextFormField(
                 controller: _happyHourStartController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Happy Hour Start',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.schedule),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourStartError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourStartError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourStartError != null ? Colors.red : Colors.deepPurple,
+                      width: 2,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.schedule,
+                    color: _happyHourStartError != null ? Colors.red : null,
+                  ),
                   hintText: 'e.g., 5:00 PM',
+                  errorText: _happyHourStartError,
                 ),
+                onChanged: (_) => _runAllHappyHourValidations(),
               ),
               const SizedBox(height: 16),
 
-              // Happy Hour End
+              // ✅ Happy Hour End with live validation and red border
               TextFormField(
                 controller: _happyHourEndController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Happy Hour End',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.schedule),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourEndError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourEndError != null ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourEndError != null ? Colors.red : Colors.deepPurple,
+                      width: 2,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.schedule,
+                    color: _happyHourEndError != null ? Colors.red : null,
+                  ),
                   hintText: 'e.g., 7:00 PM',
+                  errorText: _happyHourEndError,
                 ),
+                onChanged: (_) => _runAllHappyHourValidations(),
               ),
               const SizedBox(height: 16),
 
-              // Happy Hour Yes/No with tooltip
-              Tooltip(
-                message: '1 = Yes, 0 = No',
-                child: DropdownButtonFormField<String>(
-                  value: _happyHourYesNo,
-                  decoration: const InputDecoration(
-                    labelText: 'Happy Hour Available',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.celebration),
-                    suffixIcon: Icon(Icons.info_outline, size: 20),
+              // ✅ Happy Hour Yes/No with live validation and red border
+              DropdownButtonFormField<String>(
+                value: _happyHourYesNo,
+                decoration: InputDecoration(
+                  labelText: 'Happy Hour Available',
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourYesNoError != null ? Colors.red : Colors.grey,
+                    ),
                   ),
-                  items: const [
-                    DropdownMenuItem<String>(
-                      value: '1',
-                      child: Text('1 (Yes)'),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourYesNoError != null ? Colors.red : Colors.grey,
                     ),
-                    DropdownMenuItem<String>(
-                      value: '0',
-                      child: Text('0 (No)'),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _happyHourYesNoError != null ? Colors.red : Colors.deepPurple,
+                      width: 2,
                     ),
-                  ],
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _happyHourYesNo = newValue ?? '1';
-                    });
-                  },
+                  ),
+                  prefixIcon: Icon(
+                    Icons.celebration,
+                    color: _happyHourYesNoError != null ? Colors.red : null,
+                  ),
+                  suffixIcon: const Icon(Icons.info_outline, size: 20),
+                  errorText: _happyHourYesNoError,
                 ),
+                items: const [
+                  DropdownMenuItem<String>(
+                    value: '1',
+                    child: Text('1 (Yes)'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: '0',
+                    child: Text('0 (No)'),
+                  ),
+                ],
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _happyHourYesNo = newValue ?? '1';
+                  });
+                  _runAllHappyHourValidations();
+                },
               ),
               const SizedBox(height: 16),
 
@@ -655,7 +971,7 @@ class _BusinessRegistrationScreenState
               ),
               const SizedBox(height: 16),
 
-              // ✅ New: Map Link (Google Marker)
+              // Map Link (Google Marker)
               TextFormField(
                 controller: _mapLinkController,
                 decoration: const InputDecoration(

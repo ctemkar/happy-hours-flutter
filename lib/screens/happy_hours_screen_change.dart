@@ -62,6 +62,9 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
 
   String selectedCategory = 'ALL';
 
+  // 🆕 Dynamic categories based on available data for the selected city
+  List<String> availableCategories = ['ALL'];
+
   @override
   void initState() {
     super.initState();
@@ -165,6 +168,36 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     }
   }
 
+  // 🆕 Extract unique categories from fetched businesses
+  void _updateAvailableCategories() {
+    final uniqueCategories = <String>{'ALL'};
+    
+    for (var business in allBusinesses) {
+      if (business.category.isNotEmpty) {
+        uniqueCategories.add(business.category);
+      }
+    }
+
+    // Sort categories to maintain consistent order (ALL first, then alphabetically)
+    final sortedCategories = uniqueCategories.toList();
+    sortedCategories.sort((a, b) {
+      if (a == 'ALL') return -1;
+      if (b == 'ALL') return 1;
+      return a.compareTo(b);
+    });
+
+    setState(() {
+      availableCategories = sortedCategories;
+      
+      // Reset to 'ALL' if current selection is not available
+      if (!availableCategories.contains(selectedCategory)) {
+        selectedCategory = 'ALL';
+      }
+    });
+    
+    debugPrint('📊 Available categories for $selectedLocation: $availableCategories');
+  }
+
   Future<void> _setLocationAndFetch(String city, [String business = 'ALL']) async {
     print('Starting fetch for city: $city and business: $business');
 
@@ -176,14 +209,17 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
     });
 
     try {
-      // Add this line:
       debugPrint('Calling fetchHappyHours(city: $city, business: $business)');
       final places = await fetchHappyHours(city: city, business: business);
       print('Fetch successful, received ${places.length} places');
+      
       setState(() {
         allBusinesses = places;
         isLoading = false;
       });
+
+      // 🆕 Update available categories after fetching data
+      _updateAvailableCategories();
 
       if (allBusinesses.isNotEmpty) {
         final center = LatLng(allBusinesses.first.latitude, allBusinesses.first.longitude);
@@ -204,13 +240,6 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
         isLoading = false;
       });
     }
-    /*catch (e) {
-      print('Fetch failed with error: $e');
-      setState(() {
-        errorMessage = 'Failed to load data';
-        isLoading = false;
-      });
-    }*/
   }
 
   List<Marker> get _markers {
@@ -349,26 +378,26 @@ class _HappyHoursScreenState extends State<HappyHoursScreen> {
                                     .toList(),
                                 onChanged: (city) {
                                   if (city == null) return;
-                                  // Keep controller text in sync for any other usages
                                   _locationController.text = city;
                                   setState(() {
                                     selectedLocation = city;
+                                    selectedCategory = 'ALL'; // Reset category when city changes
                                   });
-                                  _setLocationAndFetch(city, selectedCategory);
+                                  _setLocationAndFetch(city, 'ALL');
                                 },
                               ),
                               const SizedBox(height: 12),
 
-                              // Business category buttons
+                              // 🆕 Business category buttons - now using availableCategories
                               SizedBox(
                                 height: 40,
                                 child: ListView.separated(
                                   scrollDirection: Axis.horizontal,
-                                  itemCount: businessCategories.length,
+                                  itemCount: availableCategories.length,
                                   separatorBuilder: (_, __) =>
                                       const SizedBox(width: 8),
                                   itemBuilder: (context, index) {
-                                    final category = businessCategories[index];
+                                    final category = availableCategories[index];
                                     final isSelected =
                                         selectedCategory == category;
 
