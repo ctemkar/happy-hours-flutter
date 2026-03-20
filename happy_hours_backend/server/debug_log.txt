@@ -1,0 +1,238 @@
+2026-03-20 16:15:02.382943 | ================================================================================
+2026-03-20 16:15:02.404218 |    - Business Name: 'Spice It - Ibis Mumbai Airport'
+2026-03-20 16:15:02.404856 |    - Owner Name: 'Inter Globe Hotels'
+2026-03-20 16:15:02.405635 |    - Email: 'ibishotels@gmail.com'
+2026-03-20 16:15:02.406920 |    - City: 'Mumbai'
+2026-03-20 16:15:02.407879 |    - State: 'Maharashtra'
+2026-03-20 16:15:02.408403 |    - Category: 'Restaurant'
+2026-03-20 16:15:02.410641 |    - Password length: 9
+2026-03-20 16:15:02.411294 |    - Google Marker: 'https://maps.zomato.com/php/staticmap?center=19.0965577000,72.8534206000&maptype=zomato&markers=19.0965577000,72.8534206000,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250'
+2026-03-20 16:15:02.451384 |    - 'business_image' in request.files: True
+2026-03-20 16:15:02.452364 |    - File object: <FileStorage: 'scaled_ibis-hotels.jpg' ('application/octet-stream')>
+2026-03-20 16:15:02.453381 |    - File filename: scaled_ibis-hotels.jpg
+2026-03-20 16:15:02.454517 |    - File content_type: application/octet-stream
+2026-03-20 16:15:02.454990 |    - File has filename: scaled_ibis-hotels.jpg
+2026-03-20 16:15:02.455440 |    - File extension is allowed
+2026-03-20 16:15:02.455871 |    - Extension: jpg
+2026-03-20 16:15:02.456415 |    - Safe business name: Spice_It_-_Ibis_Mumbai_Airport
+2026-03-20 16:15:02.456878 |    - Image filename: Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:15:02.457320 |    - Full image path: C:/xampp/htdocs/happy_hours_application/business_images\Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:15:02.457811 |    - Directory exists: True
+2026-03-20 16:15:02.458286 |    - Directory writable: True
+2026-03-20 16:15:02.458732 |    - Attempting to save file...
+2026-03-20 16:15:02.494972 |    - File exists after save: True
+2026-03-20 16:15:02.495719 |    - File size: 12736 bytes
+2026-03-20 16:15:02.496242 |    - Image link for DB: https://app.lovehappyhours.com/business_images/Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:15:02.499220 |    - SQL: 
+        INSERT INTO happy_hours_global_test
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, 
+         city, country, Open_hours, Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, 
+         Telephone, Remark, latitude, longitude, token, verified, Google_Marker, image_link)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    
+2026-03-20 16:15:02.499837 |    - Params count: 22
+2026-03-20 16:15:02.500350 |    - Params: ('4c02a2ae944de902', 'Inter Globe Hotels', 'ibishotels@gmail.com', '284f02de21408e419e67b2df69154147', 'Spice It - Ibis Mumbai Airport', 'Guests can enjoy the on-site multi-cuisine restaurant- Spice It and unwind with your friends over a drink & quirky selection of bar bites at the Spice It Bar. They serve continental and Indian cuisines along with authentic regional dishes.', 'Plot No F 77 Vile Parle East, Junction of Nehru Road, Mumbai, Maharashtra 400099', 'Restaurant', 'Mumbai', 'India', 'All Days 00:00 - 11:00', '01:00', '09:00', 1, '02267087777', 'good food delicious and yummy,  staff is helpfull', '19.100', '72.850', '991ecf6eb9fc0eca7344a421c6acc816', 0, 'https://maps.zomato.com/php/staticmap?center=19.0965577000,72.8534206000&maptype=zomato&markers=19.0965577000,72.8534206000,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250', 'https://app.lovehappyhours.com/business_images/Spice_It_-_Ibis_Mumbai_Airport.jpg')
+2026-03-20 16:15:02.500968 |    - Connecting to database...
+2026-03-20 16:15:04.722232 | Traceback (most recent call last):
+  File "C:\happy_hours_project\happy_hours_backend\venv\Lib\site-packages\pymysql\connections.py", line 661, in connect
+    sock = socket.create_connection(
+        (self.host, self.port), self.connect_timeout, **kwargs
+    )
+  File "C:\Users\oswal\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 864, in create_connection
+    raise exceptions[0]
+  File "C:\Users\oswal\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 849, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\happy_hours_project\happy_hours_backend\server\business_registration.py", line 573, in business_registration
+    conn = get_db_connection()
+  File "C:\happy_hours_project\happy_hours_backend\server\business_registration.py", line 95, in get_db_connection
+    return pymysql.connect(
+           ~~~~~~~~~~~~~~~^
+        host=DB_HOST,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        autocommit=False,
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\happy_hours_project\happy_hours_backend\venv\Lib\site-packages\pymysql\connections.py", line 365, in __init__
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\happy_hours_project\happy_hours_backend\venv\Lib\site-packages\pymysql\connections.py", line 723, in connect
+    raise exc
+pymysql.err.OperationalError: (2003, "Can't connect to MySQL server on '127.0.0.1' ([WinError 10061] No connection could be made because the target machine actively refused it)")
+
+2026-03-20 16:15:04.722937 | ================================================================================
+2026-03-20 16:16:05.064074 | ================================================================================
+2026-03-20 16:16:05.095244 |    - Business Name: 'Spice It - Ibis Mumbai Airport'
+2026-03-20 16:16:05.096809 |    - Owner Name: 'Inter Globe Hotels'
+2026-03-20 16:16:05.097773 |    - Email: 'ibishotels@gmail.com'
+2026-03-20 16:16:05.098669 |    - City: 'Mumbai'
+2026-03-20 16:16:05.099363 |    - State: 'Maharashtra'
+2026-03-20 16:16:05.099991 |    - Category: 'Restaurant'
+2026-03-20 16:16:05.100488 |    - Password length: 9
+2026-03-20 16:16:05.101228 |    - Google Marker: 'https://maps.zomato.com/php/staticmap?center=19.0965577000,72.8534206000&maptype=zomato&markers=19.0965577000,72.8534206000,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250'
+2026-03-20 16:16:05.108714 |    - 'business_image' in request.files: True
+2026-03-20 16:16:05.109237 |    - File object: <FileStorage: 'scaled_ibis-hotels.jpg' ('application/octet-stream')>
+2026-03-20 16:16:05.109735 |    - File filename: scaled_ibis-hotels.jpg
+2026-03-20 16:16:05.110278 |    - File content_type: application/octet-stream
+2026-03-20 16:16:05.110806 |    - File has filename: scaled_ibis-hotels.jpg
+2026-03-20 16:16:05.111269 |    - File extension is allowed
+2026-03-20 16:16:05.111945 |    - Extension: jpg
+2026-03-20 16:16:05.112704 |    - Safe business name: Spice_It_-_Ibis_Mumbai_Airport
+2026-03-20 16:16:05.113261 |    - Image filename: Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:16:05.113785 |    - Full image path: C:/xampp/htdocs/happy_hours_application/business_images\Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:16:05.114296 |    - Directory exists: True
+2026-03-20 16:16:05.115091 |    - Directory writable: True
+2026-03-20 16:16:05.115757 |    - Attempting to save file...
+2026-03-20 16:16:05.117984 |    - File exists after save: True
+2026-03-20 16:16:05.119893 |    - File size: 12736 bytes
+2026-03-20 16:16:05.120836 |    - Image link for DB: https://app.lovehappyhours.com/business_images/Spice_It_-_Ibis_Mumbai_Airport.jpg
+2026-03-20 16:16:05.123318 |    - SQL: 
+        INSERT INTO happy_hours_global_test
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, 
+         city, country, Open_hours, Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, 
+         Telephone, Remark, latitude, longitude, token, verified, Google_Marker, image_link)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    
+2026-03-20 16:16:05.124056 |    - Params count: 22
+2026-03-20 16:16:05.124661 |    - Params: ('02749b132c388f23', 'Inter Globe Hotels', 'ibishotels@gmail.com', '284f02de21408e419e67b2df69154147', 'Spice It - Ibis Mumbai Airport', 'Guests can enjoy the on-site multi-cuisine restaurant- Spice It and unwind with your friends over a drink & quirky selection of bar bites at the Spice It Bar. They serve continental and Indian cuisines along with authentic regional dishes.', 'Plot No F 77 Vile Parle East, Junction of Nehru Road, Mumbai, Maharashtra 400099', 'Restaurant', 'Mumbai', 'India', 'All Days 00:00 - 11:00', '01:00', '09:00', 1, '02267087777', 'good food delicious and yummy,  staff is helpfull', '19.100', '72.850', '50665f0ff8cfaa36f269a86db578b285', 0, 'https://maps.zomato.com/php/staticmap?center=19.0965577000,72.8534206000&maptype=zomato&markers=19.0965577000,72.8534206000,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250', 'https://app.lovehappyhours.com/business_images/Spice_It_-_Ibis_Mumbai_Airport.jpg')
+2026-03-20 16:16:05.125485 |    - Connecting to database...
+2026-03-20 16:16:05.149720 |    - Database connection successful
+2026-03-20 16:16:05.150281 |    - Checking if email exists: ibishotels@gmail.com
+2026-03-20 16:16:05.357745 |    - Email is unique, proceeding with insert
+2026-03-20 16:16:05.358339 |    - Executing INSERT query...
+2026-03-20 16:16:05.374486 |    - INSERT executed, rows affected: 1
+2026-03-20 16:16:05.375040 |    - Committing transaction...
+2026-03-20 16:16:05.410568 |    - Transaction committed successfully
+2026-03-20 16:16:05.413726 |    - Raw city value: 'Mumbai'
+2026-03-20 16:16:05.414204 |    - Processed city value: 'Mumbai'
+2026-03-20 16:16:05.415471 |    - Business Name: Spice It - Ibis Mumbai Airport
+2026-03-20 16:16:05.416041 |    - City for Header: 'Mumbai Happy Hours'
+2026-03-20 16:16:05.416648 |    - State: Maharashtra
+2026-03-20 16:16:05.417201 |    - Category: Restaurant
+2026-03-20 16:16:05.503980 |    Preview: <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spice It - Ibis Mumbai Airport | Mumbai</title>
+ 
+2026-03-20 16:16:09.596311 | ================================================================================
+2026-03-20 17:33:59.792773 | ================================================================================
+2026-03-20 17:33:59.815890 |    - Business Name: 'Woodside Inn'
+2026-03-20 17:33:59.816509 |    - Owner Name: 'Neighbourhood Hospitality Pvt/ LTd.'
+2026-03-20 17:33:59.817101 |    - Email: 'woodsideinn@gmail.com'
+2026-03-20 17:33:59.817818 |    - City: 'Mumbai'
+2026-03-20 17:33:59.818453 |    - State: 'Maharashtra'
+2026-03-20 17:33:59.819193 |    - Category: 'Fast Food'
+2026-03-20 17:33:59.819737 |    - Password length: 16
+2026-03-20 17:33:59.820231 |    - Google Marker: 'https://maps.zomato.com/php/staticmap?center=18.9246909464,72.8318912163&maptype=zomato&markers=18.9246909464,72.8318912163,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250'
+2026-03-20 17:33:59.824349 |    - 'business_image' in request.files: True
+2026-03-20 17:33:59.825021 |    - File object: <FileStorage: 'scaled_woodside-inn-restaurant.jpg' ('application/octet-stream')>
+2026-03-20 17:33:59.825583 |    - File filename: scaled_woodside-inn-restaurant.jpg
+2026-03-20 17:33:59.826527 |    - File content_type: application/octet-stream
+2026-03-20 17:33:59.827476 |    - File has filename: scaled_woodside-inn-restaurant.jpg
+2026-03-20 17:33:59.828334 |    - File extension is allowed
+2026-03-20 17:33:59.828949 |    - Extension: jpg
+2026-03-20 17:33:59.829529 |    - Safe business name: Woodside_Inn
+2026-03-20 17:33:59.830084 |    - Image filename: Woodside_Inn.jpg
+2026-03-20 17:33:59.830697 |    - Full image path: C:/xampp/htdocs/happy_hours_application/business_images\Woodside_Inn.jpg
+2026-03-20 17:33:59.831244 |    - Directory exists: True
+2026-03-20 17:33:59.831788 |    - Directory writable: True
+2026-03-20 17:33:59.832563 |    - Attempting to save file...
+2026-03-20 17:33:59.841386 |    - File exists after save: True
+2026-03-20 17:33:59.843538 |    - File size: 40047 bytes
+2026-03-20 17:33:59.844274 |    - Image link for DB: http://localhost/happy_hours_application/business_images/Woodside_Inn.jpg
+2026-03-20 17:33:59.846458 |    - SQL: 
+        INSERT INTO happy_hours_global_test
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, 
+         city, country, Open_hours, Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, 
+         Telephone, Remark, latitude, longitude, token, verified, Google_Marker, image_link)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    
+2026-03-20 17:33:59.847023 |    - Params count: 22
+2026-03-20 17:33:59.847602 |    - Params: ('e76ecce7f07e61bf', 'Neighbourhood Hospitality Pvt/ LTd.', 'woodsideinn@gmail.com', '521a0bedb19d294ee4ae9c2f9c9d7940', 'Woodside Inn', 'Woodside Inn in Colaba, Mumbai, is a popular gastropub located at Indian Mercantile Mansion, Wodehouse Road, Opposite Regal Cinema, Colaba. It is known for its European cuisine, extensive craft beer selection, and vibrant atmosphere.', 'Ground Floor, Indian Mercantile Mansion, Wodehouse Road, Opposite Regal Cinema, Colaba Causeway, Colaba, Mumbai, Maharashtra 400005.', 'Fast Food', 'Mumbai', 'India', 'All Days 11:30 - 24:00', '16:00', '20:00', 1, '912222873192', 'Craft beers, European food, and casual dining near Regal Cinema.', '18.9249', '72.8319', 'b958cbb22578a4c9c08ad8f499735685', 0, 'https://maps.zomato.com/php/staticmap?center=18.9246909464,72.8318912163&maptype=zomato&markers=18.9246909464,72.8318912163,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250', 'http://localhost/happy_hours_application/business_images/Woodside_Inn.jpg')
+2026-03-20 17:33:59.848251 |    - Connecting to database...
+2026-03-20 17:33:59.853977 |    - Database connection successful
+2026-03-20 17:33:59.854580 |    - Checking if email exists: woodsideinn@gmail.com
+2026-03-20 17:33:59.856837 |    - Email is unique, proceeding with insert
+2026-03-20 17:33:59.857422 |    - Executing INSERT query...
+2026-03-20 17:33:59.895458 |    - INSERT executed, rows affected: 1
+2026-03-20 17:33:59.896275 |    - Committing transaction...
+2026-03-20 17:33:59.957554 |    - Transaction committed successfully
+2026-03-20 17:33:59.962590 |    - Raw city value: 'Mumbai'
+2026-03-20 17:33:59.963113 |    - Processed city value: 'Mumbai'
+2026-03-20 17:33:59.964352 |    - Business Name: Woodside Inn
+2026-03-20 17:33:59.964852 |    - City for Header: 'Mumbai Happy Hours'
+2026-03-20 17:33:59.965351 |    - State: Maharashtra
+2026-03-20 17:33:59.965836 |    - Category: Fast Food
+2026-03-20 17:34:00.042600 |    Preview: <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Woodside Inn | Mumbai</title>
+  <meta name="descr
+2026-03-20 17:34:04.111337 | ================================================================================
+2026-03-20 18:50:49.816527 | ================================================================================
+2026-03-20 18:50:49.836854 |    - Business Name: 'The Little Easy Bandra'
+2026-03-20 18:50:49.837520 |    - Owner Name: 'Vishesh Shah'
+2026-03-20 18:50:49.838302 |    - Email: 'thelittleeasybandra@gmail.com'
+2026-03-20 18:50:49.838932 |    - City: 'Mumbai'
+2026-03-20 18:50:49.839371 |    - State: 'Maharashtra'
+2026-03-20 18:50:49.839865 |    - Category: 'Restaurant'
+2026-03-20 18:50:49.840340 |    - Password length: 24
+2026-03-20 18:50:49.840781 |    - Google Marker: 'https://maps.zomato.com/php/staticmap?center=19.0601607514,72.8363044560&maptype=zomato&markers=19.0601607514,72.8363044560,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250'
+2026-03-20 18:50:49.845151 |    - 'business_image' in request.files: True
+2026-03-20 18:50:49.845812 |    - File object: <FileStorage: 'scaled_thelittleeasybandra.jpg' ('application/octet-stream')>
+2026-03-20 18:50:49.846925 |    - File filename: scaled_thelittleeasybandra.jpg
+2026-03-20 18:50:49.847714 |    - File content_type: application/octet-stream
+2026-03-20 18:50:49.849948 |    - File has filename: scaled_thelittleeasybandra.jpg
+2026-03-20 18:50:49.851180 |    - File extension is allowed
+2026-03-20 18:50:49.851944 |    - Extension: jpg
+2026-03-20 18:50:49.852481 |    - Safe business name: The_Little_Easy_Bandra
+2026-03-20 18:50:49.853028 |    - Image filename: The_Little_Easy_Bandra.jpg
+2026-03-20 18:50:49.853543 |    - Full image path: C:/xampp/htdocs/happy_hours_application/business_images\The_Little_Easy_Bandra.jpg
+2026-03-20 18:50:49.854179 |    - Directory exists: True
+2026-03-20 18:50:49.854686 |    - Directory writable: True
+2026-03-20 18:50:49.855348 |    - Attempting to save file...
+2026-03-20 18:50:49.858248 |    - File exists after save: True
+2026-03-20 18:50:49.859084 |    - File size: 18066 bytes
+2026-03-20 18:50:49.859574 |    - Image link for DB: http://localhost/happy_hours_application/business_images/The_Little_Easy_Bandra.jpg
+2026-03-20 18:50:49.862467 |    - SQL: 
+        INSERT INTO happy_hours_global_test
+        (happy_hours_id, owner_name, email, password, Name, Description, Address, business_category, 
+         city, country, Open_hours, Happy_hour_start, Happy_hour_end, Happy_hours_yes_no, 
+         Telephone, Remark, latitude, longitude, token, verified, Google_Marker, image_link)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    
+2026-03-20 18:50:49.863475 |    - Params count: 22
+2026-03-20 18:50:49.864087 |    - Params: ('43d0765c58bff1fc', 'Vishesh Shah', 'thelittleeasybandra@gmail.com', '768f6d8af8b24c1ab7f9efd6d3a67fb3', 'The Little Easy Bandra', 'American, Finger Food, Italian, Pizza, Kebab, Seafood, Beverages', '231 A, Link Corner, Linking Road, Bandra West, Mumbai', 'Restaurant', 'Mumbai', 'India', '12:00 - 24:00', '12:00', '20:30', 1, '919892922232', 'Good Bartenders, Amazing Food and Experience, Peppy Music, Comfy Place, Wooden Interiors, Warm Ambience', '19.060160', '72.836304', '42aa0a8794e8098a67e95bc807cd30bb', 0, 'https://maps.zomato.com/php/staticmap?center=19.0601607514,72.8363044560&maptype=zomato&markers=19.0601607514,72.8363044560,pin_res32&sensor=false&scale=2&zoom=16&language=en&size=240x150&size=400x240&size=650x250', 'http://localhost/happy_hours_application/business_images/The_Little_Easy_Bandra.jpg')
+2026-03-20 18:50:49.865749 |    - Connecting to database...
+2026-03-20 18:50:49.870982 |    - Database connection successful
+2026-03-20 18:50:49.871723 |    - Checking if email exists: thelittleeasybandra@gmail.com
+2026-03-20 18:50:49.873987 |    - Email is unique, proceeding with insert
+2026-03-20 18:50:49.874647 |    - Executing INSERT query...
+2026-03-20 18:50:49.922683 |    - INSERT executed, rows affected: 1
+2026-03-20 18:50:49.923316 |    - Committing transaction...
+2026-03-20 18:50:49.984879 |    - Transaction committed successfully
+2026-03-20 18:50:49.989133 |    - Raw city value: 'Mumbai'
+2026-03-20 18:50:49.989722 |    - Processed city value: 'Mumbai'
+2026-03-20 18:50:49.991029 |    - Business Name: The Little Easy Bandra
+2026-03-20 18:50:49.991557 |    - City for Header: 'Mumbai Happy Hours'
+2026-03-20 18:50:49.992077 |    - State: Maharashtra
+2026-03-20 18:50:49.992579 |    - Category: Restaurant
+2026-03-20 18:50:50.037648 |    Preview: <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Little Easy Bandra | Mumbai</title>
+  <meta n
+2026-03-20 18:50:54.079818 | ================================================================================
